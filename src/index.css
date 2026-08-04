@@ -725,15 +725,74 @@ body {
   gap: 0.2rem;
 }
 
-.pass-message {
+.btn-action.btn-test-primary {
+  background: linear-gradient(135deg, #10b981, #059669);
+  color: #ffffff;
+  border: 1px solid #10b981;
+  font-weight: 700;
+  padding: 0.35rem 0.85rem;
+  box-shadow: 0 0 12px rgba(16, 185, 129, 0.3);
+}
+
+.btn-action.btn-test-primary:hover:not(:disabled) {
+  background: linear-gradient(135deg, #059669, #047857);
+  box-shadow: 0 0 18px rgba(16, 185, 129, 0.5);
+  transform: translateY(-1px);
+}
+
+.footer-test-bar {
   display: flex;
   align-items: center;
-  gap: 0.5rem;
-  font-size: 0.8rem;
-  color: var(--pass-green);
-  background: rgba(16, 185, 129, 0.06);
-  padding: 0.5rem 0.75rem;
+}
+
+.btn-run-test-big {
+  background: linear-gradient(90deg, #3b82f6, #8b5cf6);
+  color: #ffffff;
+  border: none;
   border-radius: 6px;
+  padding: 0.3rem 0.85rem;
+  font-size: 0.775rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  transition: all 0.2s ease;
+  box-shadow: 0 0 12px rgba(99, 102, 241, 0.4);
+}
+
+.btn-run-test-big:hover:not(:disabled) {
+  transform: scale(1.03);
+  box-shadow: 0 0 20px rgba(99, 102, 241, 0.7);
+}
+
+.btn-run-test-big:disabled {
+  opacity: 0.35;
+  cursor: not-allowed;
+  box-shadow: none;
+}
+
+.status-pill.ready {
+  background: rgba(59, 130, 246, 0.15);
+  color: #60a5fa;
+  border: 1px solid rgba(59, 130, 246, 0.4);
+}
+
+.banner-untested {
+  background: linear-gradient(135deg, rgba(30, 41, 59, 0.8), rgba(15, 23, 42, 0.9));
+  border: 1px solid var(--border-color);
+}
+
+.icon-ready { color: #60a5fa; }
+
+.checker-card.ready-card {
+  border-left: 4px solid var(--blue-accent);
+}
+
+.checker-badge.ready {
+  background: rgba(59, 130, 246, 0.15);
+  color: #60a5fa;
 }
 
 /* Exporter Bar */

@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState } from 'react';
 import { Header } from './components/Header';
 import { GherkinEditor } from './components/GherkinEditor';
 import { AnalysisDashboard } from './components/AnalysisDashboard';
@@ -8,25 +8,31 @@ import { runAllCheckers } from './validators/masterRunner';
 import './index.css';
 
 export default function App() {
-  const [currentSampleId, setCurrentSampleId] = useState('valid');
-  const [code, setCode] = useState(SAMPLES[0].code);
+  const [currentSampleId, setCurrentSampleId] = useState(null);
+  const [code, setCode] = useState(''); // Initial blank box when opening site
+  const [isTested, setIsTested] = useState(false);
+  const [analysisResults, setAnalysisResults] = useState(null);
+
+  const handleRunTest = (codeToTest = code) => {
+    const results = runAllCheckers(codeToTest);
+    setAnalysisResults(results);
+    setIsTested(true);
+  };
 
   const handleSelectSample = (sampleId) => {
     setCurrentSampleId(sampleId);
     const selected = SAMPLES.find(s => s.id === sampleId);
     if (selected) {
       setCode(selected.code);
+      handleRunTest(selected.code);
     }
   };
 
   const handleCodeChange = (newCode) => {
     setCode(newCode);
     setCurrentSampleId(null);
+    setIsTested(false); // Reset tested state so user clicks Test Gherkin button
   };
-
-  const analysisResults = useMemo(() => {
-    return runAllCheckers(code);
-  }, [code]);
 
   return (
     <div className="app-wrapper">
@@ -34,10 +40,11 @@ export default function App() {
       <Header
         currentSampleId={currentSampleId}
         onSelectSample={handleSelectSample}
-        totalErrors={analysisResults.totalErrors}
-        totalWarnings={analysisResults.totalWarnings}
-        overallPass={analysisResults.overallPass}
-        executionTimeMs={analysisResults.executionTimeMs}
+        totalErrors={analysisResults?.totalErrors || 0}
+        totalWarnings={analysisResults?.totalWarnings || 0}
+        overallPass={analysisResults?.overallPass || false}
+        executionTimeMs={analysisResults?.executionTimeMs || '0.00'}
+        isTested={isTested}
       />
 
       {/* Main Grid: Gherkin Editor & Analysis Dashboard */}
@@ -45,19 +52,25 @@ export default function App() {
         <GherkinEditor
           code={code}
           onChange={handleCodeChange}
-          errorsByLine={analysisResults.errorsByLine}
+          onRunTest={() => handleRunTest(code)}
+          errorsByLine={analysisResults?.errorsByLine || {}}
+          isTested={isTested}
         />
 
         <AnalysisDashboard
           results={analysisResults}
+          isTested={isTested}
+          onRunTest={() => handleRunTest(code)}
         />
       </main>
 
       {/* Report Exporter Bar */}
-      <ReportExporter
-        results={analysisResults}
-        code={code}
-      />
+      {isTested && analysisResults && (
+        <ReportExporter
+          results={analysisResults}
+          code={code}
+        />
+      )}
     </div>
   );
 }

@@ -1,0 +1,329 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>4-in-1 Gherkin Checker & Validator Suite — User Manual</title>
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=Fira+Code:wght@400;600&family=Inter:wght@400;500;600;700;800&display=swap');
+
+    @page {
+      size: A4;
+      margin: 18mm 15mm 18mm 15mm;
+    }
+
+    body {
+      font-family: 'Inter', -apple-system, sans-serif;
+      color: #1e293b;
+      line-height: 1.6;
+      background: #ffffff;
+      margin: 0;
+      padding: 0;
+      font-size: 10.5pt;
+    }
+
+    .header-banner {
+      background: linear-gradient(135deg, #0f172a 0%, #1e293b 100%);
+      color: #ffffff;
+      padding: 24px 28px;
+      border-radius: 12px;
+      margin-bottom: 24px;
+      box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+    }
+
+    .header-banner h1 {
+      font-size: 20pt;
+      font-weight: 800;
+      margin: 0 0 6px 0;
+      color: #ffffff;
+      letter-spacing: -0.02em;
+    }
+
+    .header-banner p {
+      margin: 0;
+      font-size: 10pt;
+      color: #94a3b8;
+    }
+
+    .badge-bar {
+      display: flex;
+      gap: 8px;
+      margin-top: 14px;
+      flex-wrap: wrap;
+    }
+
+    .badge {
+      background: rgba(255, 255, 255, 0.1);
+      border: 1px solid rgba(255, 255, 255, 0.2);
+      color: #38bdf8;
+      padding: 3px 10px;
+      border-radius: 6px;
+      font-size: 8.5pt;
+      font-weight: 600;
+    }
+
+    h2 {
+      font-size: 13pt;
+      font-weight: 700;
+      color: #0f172a;
+      border-bottom: 2px solid #e2e8f0;
+      padding-bottom: 6px;
+      margin-top: 22px;
+      margin-bottom: 12px;
+    }
+
+    h3 {
+      font-size: 11pt;
+      font-weight: 600;
+      color: #334155;
+      margin-top: 14px;
+      margin-bottom: 6px;
+    }
+
+    p {
+      margin-top: 0;
+      margin-bottom: 10px;
+    }
+
+    ul, ol {
+      margin-top: 0;
+      margin-bottom: 12px;
+      padding-left: 20px;
+    }
+
+    li {
+      margin-bottom: 4px;
+    }
+
+    .checker-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 12px;
+      margin-bottom: 16px;
+    }
+
+    .checker-box {
+      border: 1px solid #cbd5e1;
+      border-radius: 8px;
+      padding: 12px;
+      background: #f8fafc;
+    }
+
+    .checker-box h4 {
+      margin: 0 0 4px 0;
+      font-size: 10pt;
+      color: #0f172a;
+      font-weight: 700;
+    }
+
+    .checker-box a {
+      font-size: 8pt;
+      color: #2563eb;
+      text-decoration: none;
+      word-break: break-all;
+    }
+
+    .checker-box p {
+      font-size: 9pt;
+      color: #475569;
+      margin-top: 6px;
+      margin-bottom: 0;
+    }
+
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      margin-top: 10px;
+      margin-bottom: 16px;
+      font-size: 9.5pt;
+    }
+
+    th, td {
+      border: 1px solid #cbd5e1;
+      padding: 8px 10px;
+      text-align: left;
+    }
+
+    th {
+      background: #f1f5f9;
+      font-weight: 700;
+      color: #0f172a;
+    }
+
+    code {
+      font-family: 'Fira Code', monospace;
+      background: #f1f5f9;
+      color: #0f172a;
+      padding: 2px 5px;
+      border-radius: 4px;
+      font-size: 9pt;
+    }
+
+    .code-block {
+      background: #0f172a;
+      color: #f8fafc;
+      font-family: 'Fira Code', monospace;
+      padding: 12px 14px;
+      border-radius: 8px;
+      font-size: 8.5pt;
+      line-height: 1.4;
+      overflow-x: auto;
+      margin-bottom: 14px;
+    }
+
+    .pass-tag {
+      background: #dcfce7;
+      color: #15803d;
+      padding: 2px 8px;
+      border-radius: 4px;
+      font-weight: 700;
+      font-size: 8.5pt;
+    }
+
+    .fail-tag {
+      background: #fee2e2;
+      color: #b91c1c;
+      padding: 2px 8px;
+      border-radius: 4px;
+      font-weight: 700;
+      font-size: 8.5pt;
+    }
+
+    .footer-text {
+      margin-top: 30px;
+      padding-top: 12px;
+      border-top: 1px solid #e2e8f0;
+      font-size: 8.5pt;
+      color: #64748b;
+      text-align: center;
+    }
+  </style>
+</head>
+<body>
+
+  <div class="header-banner">
+    <h1>🥒 4-in-1 Gherkin Checker & Validator Suite</h1>
+    <p>Comprehensive User Manual & Technical Integration Guide</p>
+    <div class="badge-bar">
+      <span class="badge">React 19</span>
+      <span class="badge">Vite 8</span>
+      <span class="badge">Vercel Ready</span>
+      <span class="badge">GitHub Integrated</span>
+    </div>
+  </div>
+
+  <h2>🛠️ 1. Integrated Gherkin Checkers & Repositories</h2>
+  <p>The suite processes every pasted or uploaded Gherkin file through 4 specialized checkers simultaneously:</p>
+
+  <div class="checker-grid">
+    <div class="checker-box">
+      <h4>1. gherkin-lint</h4>
+      <a href="https://github.com/gherkin-lint/gherkin-lint">github.com/gherkin-lint/gherkin-lint</a>
+      <p>Code quality linter enforcing indentation, duplicate scenario titles, missing descriptions, repeated keywords, and logical step order.</p>
+    </div>
+
+    <div class="checker-box">
+      <h4>2. @cucumber/gherkin</h4>
+      <a href="https://github.com/cucumber/gherkin-javascript">github.com/cucumber/gherkin-javascript</a>
+      <p>Official Cucumber AST Parser validating token hierarchy, syntax correctness, tag syntax, tables, and document structure.</p>
+    </div>
+
+    <div class="checker-box">
+      <h4>3. Matriz88/gherkin-checker</h4>
+      <a href="https://github.com/Matriz88/gherkin-checker">github.com/Matriz88/gherkin-checker</a>
+      <p>Consistency matcher validating dangling steps (And/But), unclosed quote literals, and verifying Scenario Outline &lt;param&gt; placeholders exist in Examples headers.</p>
+    </div>
+
+    <div class="checker-box">
+      <h4>4. sistar/gherkin-validator</h4>
+      <a href="https://github.com/sistar/gherkin-validator">github.com/sistar/gherkin-validator</a>
+      <p>Lexical token scanner verifying table pipe alignments (|), column count mismatches across rows, and DocString block fencing (""").</p>
+    </div>
+  </div>
+
+  <h2>📖 2. How to Use the Application</h2>
+
+  <h3>Step 1: Input Your Gherkin Feature Code</h3>
+  <ul>
+    <li><strong>Paste Directly</strong>: Type or paste Gherkin text into the Gherkin Feature Editor.</li>
+    <li><strong>Upload File</strong>: Click <code>Upload File</code> to select a <code>.feature</code> or <code>.txt</code> file.</li>
+    <li><strong>1-Click Presets</strong>: Test using 4 built-in preset test cases:
+      <ul>
+        <li><code>Valid Feature</code>: Clean feature passing all 4 checkers.</li>
+        <li><code>Syntax & Lexing Errors</code>: Demonstrates syntax and token failures.</li>
+        <li><code>Linter Rule Violations</code>: Demonstrates duplicate scenario names & formatting warnings.</li>
+        <li><code>Inconsistent Steps</code>: Demonstrates dangling steps & missing outline parameters.</li>
+      </ul>
+    </li>
+  </ul>
+
+  <h3>Step 2: Real-Time Instant Analysis</h3>
+  <p>The application runs all 4 checkers concurrently on every keystroke. Results update in <strong>&lt; 5 milliseconds</strong> without requiring a manual submit button.</p>
+
+  <h3>Step 3: Export Summary Reports</h3>
+  <p>Export full analysis reports via the <code>Download JSON Report</code> or <code>Download Markdown Report</code> buttons.</p>
+
+  <h2>🔍 3. How to Interpret Validations & Errors</h2>
+
+  <h3>Overall Pass / Fail Banner</h3>
+  <p>
+    <span class="pass-tag">PASS</span> Displayed when 0 errors are found across all 4 checkers. Celebratory confetti triggers automatically.<br/>
+    <span class="fail-tag">FAIL</span> Displayed when 1 or more errors are detected, showing total issue counts.
+  </p>
+
+  <h3>Detailed Failure Breakdown</h3>
+  <table>
+    <thead>
+      <tr>
+        <th>Field</th>
+        <th>Description</th>
+        <th>Example Output</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td><strong>Line Number</strong></td>
+        <td>Exact line number in your <code>.feature</code> file</td>
+        <td><code>Line 14</code></td>
+      </tr>
+      <tr>
+        <td><strong>Category & Rule</strong></td>
+        <td>Categorized error badge & rule name</td>
+        <td><code>[AST Syntax Error]</code> / <code>rule: parse-error</code></td>
+      </tr>
+      <tr>
+        <td><strong>Failing Snippet</strong></td>
+        <td>Exact code text on that failing line</td>
+        <td><code>| Laptop | 1000</code></td>
+      </tr>
+      <tr>
+        <td><strong>Failure Reason</strong></td>
+        <td>Plain-English explanation of why it failed</td>
+        <td><code>Table row must end with a pipe character "|".</code></td>
+      </tr>
+      <tr>
+        <td><strong>Suggested Fix</strong></td>
+        <td>Step-by-step guidance on how to resolve it</td>
+        <td><code>Add a trailing pipe "|" to close the table cell row on this line.</code></td>
+      </tr>
+    </tbody>
+  </table>
+
+  <h3>Editor Line Markers</h3>
+  <ul>
+    <li>Red circle markers highlight lines with critical errors.</li>
+    <li>Yellow warning triangles highlight quality warnings.</li>
+    <li>Clicking any error item in the dashboard scrolls and highlights the line in the editor.</li>
+  </ul>
+
+  <h2>🚀 4. Repository & Vercel Deployment</h2>
+  <div class="code-block">
+GitHub Repository: https://github.com/Sekhar03/gherkin-checker.git
+Deploy to Vercel: Connect repository on vercel.com/new and click Deploy.
+  </div>
+
+  <div class="footer-text">
+    Generated automatically by Antigravity AI • Gherkin Checker & Validator Suite
+  </div>
+
+</body>
+</html>

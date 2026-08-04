@@ -1,20 +1,72 @@
 import React, { useEffect } from 'react';
 import confetti from 'canvas-confetti';
-import { CheckCircle2, XCircle, AlertTriangle, ExternalLink, Lightbulb, Wrench, FileCode, Tag } from 'lucide-react';
+import { CheckCircle2, XCircle, AlertTriangle, ExternalLink, Lightbulb, Wrench, FileCode, Tag, Play, ShieldCheck } from 'lucide-react';
 
-export function AnalysisDashboard({ results, onHighlightLine }) {
-  const { overallPass, totalErrors, totalWarnings, checkers } = results;
+export function AnalysisDashboard({ results, isTested, onRunTest, onHighlightLine }) {
+  const { overallPass, totalErrors, totalWarnings, checkers } = results || {
+    overallPass: false,
+    totalErrors: 0,
+    totalWarnings: 0,
+    checkers: [
+      { name: 'gherkin-lint', repo: 'https://github.com/gherkin-lint/gherkin-lint', description: 'Gherkin Best Practices & Code Quality Linter', pass: true, errors: [], warnings: [] },
+      { name: '@cucumber/gherkin', repo: 'https://github.com/cucumber/gherkin-javascript', description: 'Official Cucumber Gherkin AST Parser & Syntax Validator', pass: true, errors: [], warnings: [] },
+      { name: 'Matriz88/gherkin-checker', repo: 'https://github.com/Matriz88/gherkin-checker', description: 'Scenario Consistency & Step Definition Structure Matcher', pass: true, errors: [], warnings: [] },
+      { name: 'sistar/gherkin-validator', repo: 'https://github.com/sistar/gherkin-validator', description: 'Strict Gherkin Lexer & Token Structure Validator', pass: true, errors: [], warnings: [] }
+    ]
+  };
 
   useEffect(() => {
-    if (overallPass && checkers.length > 0) {
+    if (isTested && overallPass && checkers.length > 0) {
       confetti({
         particleCount: 90,
         spread: 80,
         origin: { y: 0.6 }
       });
     }
-  }, [overallPass]);
+  }, [isTested, overallPass]);
 
+  // UN-TESTED / INITIAL STATE
+  if (!isTested) {
+    return (
+      <div className="dashboard-container">
+        <div className="hero-banner banner-untested">
+          <div className="banner-icon-box">
+            <ShieldCheck size={48} className="icon-ready" />
+          </div>
+
+          <div className="banner-content">
+            <div className="banner-tag">READY FOR VALIDATION</div>
+            <h2 className="banner-title">Paste your Gherkin file & click "Test Gherkin"</h2>
+            <p className="banner-desc">
+              Your feature file will pass through all 4 checkers simultaneously (@cucumber/gherkin AST, gherkin-lint rules, Matriz88 consistency, and sistar lexer tokens).
+            </p>
+          </div>
+        </div>
+
+        {/* Preview of 4 Checkers Ready */}
+        <div className="checkers-grid">
+          {checkers.map((c) => (
+            <div key={c.name} className="checker-card ready-card">
+              <div className="checker-card-header">
+                <div className="checker-info">
+                  <span className="checker-name">{c.name}</span>
+                  <a href={c.repo} target="_blank" rel="noreferrer" className="repo-link">
+                    <ExternalLink size={13} />
+                  </a>
+                </div>
+                <div className="checker-badge ready">
+                  <span>READY</span>
+                </div>
+              </div>
+              <p className="checker-desc">{c.description}</p>
+            </div>
+          ))}
+        </div>
+      </div>
+    );
+  }
+
+  // TESTED STATE
   return (
     <div className="dashboard-container">
       {/* Prominent Overall Pass/Fail Status Banner */}
@@ -89,7 +141,6 @@ export function AnalysisDashboard({ results, onHighlightLine }) {
                   <h4 className="list-heading">Detailed Failures ({checker.errors.length}):</h4>
                   {checker.errors.map((err, idx) => (
                     <div key={idx} className="error-item" onClick={() => onHighlightLine?.(err.line)}>
-                      {/* Top Bar: Line & Category Badges */}
                       <div className="error-item-top">
                         <span className="line-badge">Line {err.line}</span>
                         {err.category && (
@@ -104,7 +155,6 @@ export function AnalysisDashboard({ results, onHighlightLine }) {
                         )}
                       </div>
 
-                      {/* Failing Code Snippet */}
                       {err.text !== undefined && (
                         <div className="failing-text-box">
                           <div className="snippet-label">
@@ -114,7 +164,6 @@ export function AnalysisDashboard({ results, onHighlightLine }) {
                         </div>
                       )}
 
-                      {/* Failure Reason */}
                       <div className="error-reason">
                         <span className="reason-label">
                           <Lightbulb size={12} className="icon-reason" /> Clear Failure Reason:
@@ -122,7 +171,6 @@ export function AnalysisDashboard({ results, onHighlightLine }) {
                         <div className="reason-text">{err.reason}</div>
                       </div>
 
-                      {/* Recommended Fix */}
                       {err.fix && (
                         <div className="error-fix-box">
                           <span className="fix-label">

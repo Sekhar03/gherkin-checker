@@ -1,11 +1,11 @@
 import React, { useRef } from 'react';
-import { Upload, Download, Copy, Trash2, FileText, AlertCircle, AlertTriangle } from 'lucide-react';
+import { Upload, Download, Copy, Trash2, FileText, AlertCircle, AlertTriangle, Play, Zap } from 'lucide-react';
 
-export function GherkinEditor({ code, onChange, errorsByLine }) {
+export function GherkinEditor({ code, onChange, onRunTest, errorsByLine = {}, isTested }) {
   const fileInputRef = useRef(null);
   const textareaRef = useRef(null);
 
-  const lines = code.split('\n');
+  const lines = code ? code.split('\n') : [''];
 
   const handleFileUpload = (e) => {
     const file = e.target.files[0];
@@ -47,8 +47,18 @@ export function GherkinEditor({ code, onChange, errorsByLine }) {
         </div>
 
         <div className="editor-actions">
+          {/* Prominent Test / Analyze Button */}
+          <button
+            onClick={onRunTest}
+            className="btn-action btn-test-primary"
+            disabled={!code.trim()}
+            title="Click to run analysis through all 4 checkers"
+          >
+            <Play size={14} fill="currentColor" /> Test Gherkin
+          </button>
+
           <button onClick={() => fileInputRef.current?.click()} className="btn-action">
-            <Upload size={14} /> Upload File
+            <Upload size={14} /> Upload
           </button>
           <input
             type="file"
@@ -77,7 +87,7 @@ export function GherkinEditor({ code, onChange, errorsByLine }) {
         <div className="line-numbers">
           {lines.map((_, index) => {
             const lineNum = index + 1;
-            const lineErrors = errorsByLine[lineNum] || [];
+            const lineErrors = isTested ? (errorsByLine[lineNum] || []) : [];
             const hasError = lineErrors.some(e => e.reason);
             const hasWarning = lineErrors.some(e => e.rule);
 
@@ -101,14 +111,26 @@ export function GherkinEditor({ code, onChange, errorsByLine }) {
           className="code-textarea"
           value={code}
           onChange={(e) => onChange(e.target.value)}
-          placeholder="Paste or type your Gherkin feature file here...&#10;&#10;Feature: My Awesome Feature&#10;  Scenario: My Test Scenario&#10;    Given the user is logged in&#10;    When the user clicks submit&#10;    Then success message is shown"
+          placeholder="Paste your Gherkin feature file here...&#10;&#10;Example:&#10;Feature: User Authentication System&#10;  Scenario: Successful login with valid credentials&#10;    Given the user is on the login page&#10;    When the user enters valid username and password&#10;    Then the user should be redirected to dashboard&#10;&#10;👉 Then click the 'TEST GHERKIN' button to analyze!"
           spellCheck="false"
         />
       </div>
 
       <div className="editor-footer">
         <span>Lines: {lines.length} | Characters: {code.length}</span>
-        {Object.keys(errorsByLine).length > 0 && (
+
+        {/* Big Test Button at Bottom if code exists */}
+        <div className="footer-test-bar">
+          <button
+            onClick={onRunTest}
+            className="btn-run-test-big"
+            disabled={!code.trim()}
+          >
+            <Zap size={14} /> RUN ALL 4 CHECKERS
+          </button>
+        </div>
+
+        {isTested && Object.keys(errorsByLine).length > 0 && (
           <span className="error-highlight-notice">
             <AlertCircle size={13} /> {Object.keys(errorsByLine).length} lines flagged with issues
           </span>

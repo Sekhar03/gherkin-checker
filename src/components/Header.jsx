@@ -1,8 +1,8 @@
 import React from 'react';
-import { ShieldCheck, Github, Sparkles, CheckCircle2, AlertTriangle, FileCode } from 'lucide-react';
+import { ShieldCheck, Github, Sparkles, CheckCircle2, AlertTriangle, Play } from 'lucide-react';
 import { SAMPLES } from '../utils/samples';
 
-export function Header({ currentSampleId, onSelectSample, totalErrors, totalWarnings, overallPass, executionTimeMs }) {
+export function Header({ currentSampleId, onSelectSample, totalErrors, totalWarnings, overallPass, executionTimeMs, isTested }) {
   const repos = [
     { name: 'gherkin-lint', url: 'https://github.com/gherkin-lint/gherkin-lint', tag: 'Linter Rules' },
     { name: '@cucumber/gherkin', url: 'https://github.com/cucumber/gherkin-javascript', tag: 'Cucumber AST Parser' },
@@ -26,22 +26,31 @@ export function Header({ currentSampleId, onSelectSample, totalErrors, totalWarn
         </div>
 
         <div className="header-status-pills">
-          <div className={`status-pill ${overallPass ? 'pass' : 'fail'}`}>
-            {overallPass ? <CheckCircle2 size={16} /> : <AlertTriangle size={16} />}
-            <span>{overallPass ? 'PASS' : 'FAIL'}</span>
-          </div>
-          <div className="metric-pill">
-            <span className="label">Errors:</span>
-            <span className={`val ${totalErrors > 0 ? 'text-red' : 'text-green'}`}>{totalErrors}</span>
-          </div>
-          <div className="metric-pill">
-            <span className="label">Warnings:</span>
-            <span className="val text-amber">{totalWarnings}</span>
-          </div>
-          <div className="metric-pill">
-            <span className="label">Analysis:</span>
-            <span className="val">{executionTimeMs} ms</span>
-          </div>
+          {isTested ? (
+            <>
+              <div className={`status-pill ${overallPass ? 'pass' : 'fail'}`}>
+                {overallPass ? <CheckCircle2 size={16} /> : <AlertTriangle size={16} />}
+                <span>{overallPass ? 'PASS' : 'FAIL'}</span>
+              </div>
+              <div className="metric-pill">
+                <span className="label">Errors:</span>
+                <span className={`val ${totalErrors > 0 ? 'text-red' : 'text-green'}`}>{totalErrors}</span>
+              </div>
+              <div className="metric-pill">
+                <span className="label">Warnings:</span>
+                <span className="val text-amber">{totalWarnings}</span>
+              </div>
+              <div className="metric-pill">
+                <span className="label">Analysis:</span>
+                <span className="val">{executionTimeMs} ms</span>
+              </div>
+            </>
+          ) : (
+            <div className="status-pill ready">
+              <Play size={15} />
+              <span>READY TO TEST</span>
+            </div>
+          )}
         </div>
       </div>
 
