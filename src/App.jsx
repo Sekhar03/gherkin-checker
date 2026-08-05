@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Header } from './components/Header';
 import { GherkinEditor } from './components/GherkinEditor';
 import { AnalysisDashboard } from './components/AnalysisDashboard';
@@ -8,10 +8,22 @@ import { runAllCheckers } from './validators/masterRunner';
 import './index.css';
 
 export default function App() {
+  const [theme, setTheme] = useState(() => {
+    return localStorage.getItem('gherkin_theme') || 'light';
+  });
   const [currentSampleId, setCurrentSampleId] = useState(null);
   const [code, setCode] = useState(''); // Initial blank box when opening site
   const [isTested, setIsTested] = useState(false);
   const [analysisResults, setAnalysisResults] = useState(null);
+
+  useEffect(() => {
+    document.documentElement.setAttribute('data-theme', theme);
+    localStorage.setItem('gherkin_theme', theme);
+  }, [theme]);
+
+  const toggleTheme = () => {
+    setTheme(prev => (prev === 'light' ? 'dark' : 'light'));
+  };
 
   const handleRunTest = (codeToTest = code) => {
     const results = runAllCheckers(codeToTest);
@@ -38,6 +50,8 @@ export default function App() {
     <div className="app-wrapper">
       {/* Header */}
       <Header
+        theme={theme}
+        onToggleTheme={toggleTheme}
         currentSampleId={currentSampleId}
         onSelectSample={handleSelectSample}
         totalErrors={analysisResults?.totalErrors || 0}
