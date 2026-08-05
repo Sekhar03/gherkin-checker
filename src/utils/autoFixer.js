@@ -14,9 +14,72 @@ export function autoFixGherkin(code) {
     Then the system should process the request successfully`;
   }
 
-  let rawLines = code.split('\n').map(l => l.trimEnd());
+  // Pre-pass: Handle multiple Feature definitions & multiple Background sections
+  let featureCount = 0;
+  let backgroundCount = 0;
+  let activeRuleBackgroundSteps = [];
 
-  // Step 1: Pre-process block structure (Feature, Scenarios, Backgrounds, Outlines, Examples)
+  const preProcessedLines = [];
+  const rawInputLines = code.split('\n');
+
+  for (let i = 0; i < rawInputLines.length; i++) {
+    let line = rawInputLines[i];
+    let trimmed = line.trim();
+
+    // Fix trailing unmatched single quote e.g. balance' -> balance
+    if (trimmed.endsWith("'") && (trimmed.match(/'/g) || []).length % 2 !== 0) {
+      line = line.slice(0, line.lastIndexOf("'"));
+      trimmed = line.trim();
+    }
+
+    // Convert 2nd+ Feature: to Rule: (Gherkin 6+ standard for multi-domain feature files)
+    if (/^feature\b/i.test(trimmed) || trimmed.startsWith('Feature:') || trimmed.startsWith('Feature')) {
+      featureCount++;
+      if (featureCount > 1) {
+        let title = trimmed.replace(/^feature\s*:?\s*/i, '').trim() || 'Additional Feature Rules';
+        preProcessedLines.push(`Rule: ${title}`);
+        activeRuleBackgroundSteps = [];
+        continue;
+      }
+    }
+
+    // Handle secondary Background: blocks under Rules
+    if (/^background\b/i.test(trimmed) || trimmed.startsWith('Background:') || trimmed.startsWith('Background')) {
+      backgroundCount++;
+      if (backgroundCount > 1) {
+        activeRuleBackgroundSteps = [];
+        i++;
+        while (i < rawInputLines.length) {
+          let bgLine = rawInputLines[i];
+          let bgTrimmed = bgLine.trim();
+          if (/^(scenario|scenario outline|rule|feature)\b/i.test(bgTrimmed) || bgTrimmed.startsWith('Scenario:') || bgTrimmed.startsWith('Rule:') || bgTrimmed.startsWith('Feature:')) {
+            i--;
+            break;
+          }
+          if (bgTrimmed && !bgTrimmed.startsWith('#')) {
+            activeRuleBackgroundSteps.push(bgTrimmed);
+          }
+          i++;
+        }
+        continue;
+      }
+    }
+
+    // Inject active Rule Background steps before first step of Scenario
+    if (activeRuleBackgroundSteps.length > 0 && (/^(scenario|scenario outline)\b/i.test(trimmed) || trimmed.startsWith('Scenario:') || trimmed.startsWith('Scenario Outline:'))) {
+      preProcessedLines.push(line);
+      activeRuleBackgroundSteps.forEach(step => {
+        preProcessedLines.push('    ' + step);
+      });
+      continue;
+    }
+
+    preProcessedLines.push(line);
+  }
+
+  let rawLines = preProcessedLines.map(l => l.trimEnd());
+
+  // Step 1: Pre-process block structure (Feature, Scenarios, Backgrounds, Outlines, Examples, Rules)
   let hasFeature = false;
   const blocks = [];
   let currentBlock = null;
@@ -38,6 +101,13 @@ export function autoFixGherkin(code) {
       hasFeature = true;
       let title = trimmed.replace(/^feature\s*:?\s*/i, '').trim() || 'User Feature Specification';
       currentBlock = { type: 'feature', title, lines: [] };
+      blocks.push(currentBlock);
+      continue;
+    }
+
+    if (/^rule\b/i.test(trimmed) || trimmed.startsWith('Rule:')) {
+      let title = trimmed.replace(/^rule\s*:?\s*/i, '').trim() || 'Business Rule';
+      currentBlock = { type: 'rule', title, lines: [] };
       blocks.push(currentBlock);
       continue;
     }
@@ -117,7 +187,6 @@ export function autoFixGherkin(code) {
       }
       outputLines.push('');
     } else if (outlineExamplesHeader.length > 0) {
-      // Verify all placeholders in steps exist in Examples table header
       const phList = Array.from(outlinePlaceholders);
       let updatedHeader = [...outlineExamplesHeader];
 
@@ -162,6 +231,13 @@ export function autoFixGherkin(code) {
       continue;
     }
 
+    if (block.type === 'rule') {
+      flushOutlineExamples();
+      outputLines.push(`\nRule: ${block.title}`);
+      lastKeyword = null;
+      continue;
+    }
+
     if (block.type === 'background') {
       flushOutlineExamples();
       outputLines.push(`  ${block.title ? `Background: ${block.title}` : 'Background:'}`);
@@ -200,7 +276,6 @@ export function autoFixGherkin(code) {
       outputLines.push(`  Scenario Outline: ${title}`);
       lastKeyword = null;
 
-      // Process steps and extract placeholders <param>
       processBlockLines(block.lines, outputLines, '    ', (kw) => { lastKeyword = kw; }, lastKeyword, (ph) => {
         outlinePlaceholders.add(ph);
       });
@@ -209,13 +284,11 @@ export function autoFixGherkin(code) {
 
     if (block.type === 'examples') {
       if (!inOutline) {
-        // If Examples block appeared without preceding Scenario Outline, treat as Outline
         outputLines.push('  Scenario Outline: Data Driven User Flow');
         inOutline = true;
       }
       outlineHasExamples = true;
 
-      // Extract table headers and rows
       block.lines.forEach(line => {
         let trimmed = line.trim();
         if (trimmed.startsWith('|') || trimmed.includes('|')) {
@@ -244,7 +317,6 @@ export function autoFixGherkin(code) {
       continue;
     }
 
-    // Generic lines (data tables or missing Examples fallback)
     if (block.lines.length > 0) {
       let isTableOnly = block.lines.every(l => {
         let t = l.trim();
@@ -252,7 +324,6 @@ export function autoFixGherkin(code) {
       });
 
       if (isTableOnly && inOutline && !outlineHasExamples) {
-        // Missing Examples: header above table!
         outlineHasExamples = true;
         block.lines.forEach(line => {
           let trimmed = line.trim();
@@ -277,9 +348,9 @@ export function autoFixGherkin(code) {
 
   flushOutlineExamples();
 
-  // Final Pass: Ensure line formatting and return clean string
   return outputLines.join('\n').replace(/\n{3,}/g, '\n\n');
 }
+
 
 function processBlockLines(lines, outputArr, indent, onKeywordChange, initialLastKeyword, onPlaceholderFound) {
   let lastKw = initialLastKeyword || null;
