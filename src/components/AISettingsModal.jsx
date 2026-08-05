@@ -78,6 +78,19 @@ export function AISettingsModal({ isOpen, onClose, apiKey, onSaveApiKey, apiProv
             </a>
 
             <div className="modal-actions">
+              {tempKey && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    setTempKey('');
+                    onSaveApiKey('');
+                  }}
+                  className="btn-cancel"
+                  title="Remove saved API key and use built-in engine"
+                >
+                  Clear Key
+                </button>
+              )}
               <button type="button" onClick={onClose} className="btn-cancel">
                 Cancel
               </button>

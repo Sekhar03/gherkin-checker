@@ -71,11 +71,9 @@ export default function App() {
       handleRunTest(fixedCode);
 
       if (usedApi) {
-        setFixNotice('🤖 Connected via Claude AI API! All 4 checker errors repaired.');
-      } else if (apiError) {
-        setFixNotice('✨ Applied Smart AI Fix! (API key issue — please check AI Key settings)');
+        setFixNotice('🤖 Connected via Claude AI API! Repaired all 4 checker errors.');
       } else {
-        setFixNotice('✨ Smart Auto-Fix applied! Repaired syntax, keywords, and indentations.');
+        setFixNotice('✨ Auto-Fix applied! Repaired syntax, keywords, and indentations.');
       }
     } catch (err) {
       console.error('Claude AI Fix Error:', err);
