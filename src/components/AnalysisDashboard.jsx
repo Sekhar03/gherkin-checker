@@ -16,14 +16,14 @@ export function AnalysisDashboard({ results, isTested, onRunTest, onHighlightLin
   };
 
   useEffect(() => {
-    if (isTested && overallPass && checkers.length > 0) {
+    if (isTested && overallPass && Array.isArray(checkers) && checkers.length > 0) {
       confetti({
         particleCount: 90,
         spread: 80,
         origin: { y: 0.6 }
       });
     }
-  }, [isTested, overallPass]);
+  }, [isTested, overallPass, checkers]);
 
   // UN-TESTED / INITIAL STATE
   if (!isTested) {

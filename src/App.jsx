@@ -12,7 +12,11 @@ import './index.css';
 
 export default function App() {
   const [theme, setTheme] = useState(() => {
-    return localStorage.getItem('gherkin_theme') || 'light';
+    try {
+      return localStorage.getItem('gherkin_theme') || 'light';
+    } catch {
+      return 'light';
+    }
   });
   const [currentSampleId, setCurrentSampleId] = useState(null);
   const [code, setCode] = useState(''); // Initial blank box when opening site
@@ -23,12 +27,26 @@ export default function App() {
   // Claude AI state
   const [isFixingWithAI, setIsFixingWithAI] = useState(false);
   const [isAISettingsOpen, setIsAISettingsOpen] = useState(false);
-  const [claudeApiKey, setClaudeApiKey] = useState(() => localStorage.getItem('claude_api_key') || '');
-  const [claudeProvider, setClaudeProvider] = useState(() => localStorage.getItem('claude_provider') || 'anthropic');
+  const [claudeApiKey, setClaudeApiKey] = useState(() => {
+    try {
+      return localStorage.getItem('claude_api_key') || '';
+    } catch {
+      return '';
+    }
+  });
+  const [claudeProvider, setClaudeProvider] = useState(() => {
+    try {
+      return localStorage.getItem('claude_provider') || 'anthropic';
+    } catch {
+      return 'anthropic';
+    }
+  });
 
   useEffect(() => {
     document.documentElement.setAttribute('data-theme', theme);
-    localStorage.setItem('gherkin_theme', theme);
+    try {
+      localStorage.setItem('gherkin_theme', theme);
+    } catch {}
   }, [theme]);
 
   const toggleTheme = () => {
@@ -37,12 +55,16 @@ export default function App() {
 
   const handleSaveApiKey = (key) => {
     setClaudeApiKey(key);
-    localStorage.setItem('claude_api_key', key);
+    try {
+      localStorage.setItem('claude_api_key', key);
+    } catch {}
   };
 
   const handleSaveProvider = (provider) => {
     setClaudeProvider(provider);
-    localStorage.setItem('claude_provider', provider);
+    try {
+      localStorage.setItem('claude_provider', provider);
+    } catch {}
   };
 
   const handleRunTest = (codeToTest = code) => {
