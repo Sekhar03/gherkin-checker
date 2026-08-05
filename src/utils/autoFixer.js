@@ -2,8 +2,7 @@ import { runAllCheckers } from '../validators/masterRunner.js';
 
 /**
  * Comprehensive Internal Rule-Based Gherkin Auto-Fixer Engine
- * Trained against official Cucumber test suites (cucumber/gherkin & cucumber/common).
- * Reads errors & warnings from all 4 checkers and repairs them deterministically without using AI.
+ * Reads errors & warnings from all 4 checkers and repairs both ERRORS and WARNINGS deterministically.
  */
 
 export function autoFixGherkin(code, initialResults = null) {
@@ -18,11 +17,11 @@ export function autoFixGherkin(code, initialResults = null) {
 
   let currentCode = code;
 
-  // Run up to 3 repair passes until all errors & warnings are cleared
-  for (let pass = 1; pass <= 3; pass++) {
+  // Run up to 4 repair passes until all errors & warnings are cleared
+  for (let pass = 1; pass <= 4; pass++) {
     const results = (pass === 1 && initialResults) ? initialResults : runAllCheckers(currentCode);
 
-    // If completely clean (no errors & no warnings), stop early!
+    // Stop early if no errors and no warnings left!
     if (results.totalErrors === 0 && results.totalWarnings === 0) {
       break;
     }
@@ -35,27 +34,17 @@ export function autoFixGherkin(code, initialResults = null) {
     currentCode = nextCode;
   }
 
-  // Final structural & indentation pass to ensure perfect formatting
+  // Final structural pass & indentation pass
   return formatAndStructureGherkin(currentCode);
 }
 
 /**
- * Single deterministic repair pass guided by actual error & warning objects
+ * Single deterministic repair pass guided by active error & warning rules
  */
-function runSingleRepairPass(code, results) {
+function runSingleRepairPass(code, _results) {
   const lines = code.split('\n');
 
-  // Collect active error & warning rules
-  const activeRules = new Set();
-  if (results && results.checkers) {
-    results.checkers.forEach(c => {
-      [...(c.errors || []), ...(c.warnings || [])].forEach(issue => {
-        if (issue.rule) activeRules.add(issue.rule);
-      });
-    });
-  }
-
-  // Pass 1: Targeted Line-Level Fixes
+  // Pass 1: Targeted Line-Level Fixes (errors & warnings)
   for (let i = 0; i < lines.length; i++) {
     let line = lines[i];
     let trimmed = line.trim();
@@ -65,37 +54,43 @@ function runSingleRepairPass(code, results) {
       continue;
     }
 
-    // Fix trailing spaces
+    // Fix trailing spaces (rule: no-trailing-spaces)
     if (/\s+$/.test(line)) {
       line = line.trimEnd();
     }
 
-    // Fix step line ending punctuation
+    // Fix step line warnings & errors
     const stepMatch = trimmed.match(/^(given|when|then|and|but|\*)\b\s*(.*)/i);
     if (stepMatch) {
+      let rawKw = stepMatch[1];
       let stepText = stepMatch[2];
 
-      // Fix ending punctuation on steps
+      // Fix ending punctuation on steps (rule: no-ending-punctuation)
       if (/[.,;:]$/.test(stepText)) {
-        line = line.replace(/[.,;:]$/, '');
-        trimmed = line.trim();
-        stepText = stepText.slice(0, -1);
+        stepText = stepText.slice(0, -1).trim();
       }
 
-      // Fix unclosed double quotes
+      // Fix first-person "I" / "my" (rule: no-first-person-perspective)
+      stepText = refactorFirstPerson(stepText);
+
+      // Fix low-level procedural/imperative UI actions (rule: imperative-steps-warning)
+      stepText = refactorImperativeStep(stepText);
+
+      // Fix unclosed double quotes (rule: unclosed-double-quote)
       const dQuotes = (stepText.match(/"/g) || []).length;
       if (dQuotes % 2 !== 0) {
-        line = line + '"';
-        trimmed = line.trim();
+        stepText = stepText + '"';
       }
 
-      // Fix unclosed single quotes (ignoring possessive apostrophes like merchant's, today's)
+      // Fix unclosed single quotes (rule: unclosed-single-quote)
       const codeQuotesOnly = stepText.replace(/[a-zA-Z]'[a-zA-Z]/g, '');
       const sQuotes = (codeQuotesOnly.match(/'/g) || []).length;
       if (sQuotes % 2 !== 0) {
-        line = line + "'";
-        trimmed = line.trim();
+        stepText = stepText + "'";
       }
+
+      line = `    ${rawKw} ${stepText}`;
+      trimmed = line.trim();
     }
 
     // Fix unclosed pipe tables
@@ -104,7 +99,7 @@ function runSingleRepairPass(code, results) {
       trimmed = line.trim();
     }
 
-    // Fix malformed or non-standard tags (lowercase, hyphenated)
+    // Fix malformed or non-standard tags (rule: tag-convention)
     if (trimmed.startsWith('@')) {
       const parts = trimmed.split(/\s+/);
       const cleaned = parts.map(tag => {
@@ -138,23 +133,20 @@ function runSingleRepairPass(code, results) {
   let processedCode = lines.join('\n');
 
   // Pass 2: Document Structure Reconstruction
-  return reconstructDocumentStructure(processedCode, activeRules);
+  return reconstructDocumentStructure(processedCode);
 }
 
 /**
  * Reconstructs Gherkin Document Structure:
- * - Handles single & multi-feature documents (converts 2nd+ Features to Gherkin 6+ Rules)
- * - Preserves Feature, Rule & Examples description blocks
- * - Guarantees Feature at root before Background
- * - Resolves duplicate background blocks
- * - De-duplicates scenario names
- * - Fixes dangling conjunctions (And/But before Given)
- * - Converts repeated Given/When/Then to And
+ * - Fixes multi-feature documents (converts 2nd+ Features to Gherkin 6+ Rules)
+ * - De-duplicates scenario names & feature tags
+ * - Fixes dangling conjunctions (starts with And/But -> Given)
+ * - Converts repeated consecutive Given/When/Then to And (rule: use-and)
  * - Re-orders out-of-sequence steps (Given -> When -> Then)
  * - Generates & fixes Examples tables for Scenario Outlines
- * - Normalizes data tables & closes unclosed DocStrings at EOF
+ * - Normalizes data tables & closes unclosed DocStrings
  */
-function reconstructDocumentStructure(code, _activeRules = new Set()) {
+function reconstructDocumentStructure(code) {
   const rawLines = code.split('\n');
 
   let mainFeatureTitle = null;
@@ -166,6 +158,7 @@ function reconstructDocumentStructure(code, _activeRules = new Set()) {
   let docStringDelimiter = '"""';
 
   let featureCount = 0;
+  const featureTagsSet = new Set();
 
   for (let i = 0; i < rawLines.length; i++) {
     let line = rawLines[i];
@@ -245,12 +238,23 @@ function reconstructDocumentStructure(code, _activeRules = new Set()) {
     }
 
     if (trimmed.startsWith('@')) {
+      const tagsList = trimmed.split(/\s+/).map(t => {
+        if (!t.startsWith('@')) return t;
+        return '@' + t.slice(1).toLowerCase().replace(/[^a-z0-9-]/g, '-');
+      });
+
       if (!currentBlock || currentBlock.type === 'background') {
-        currentBlock = { type: 'tags', lines: [trimmed] };
+        tagsList.forEach(t => featureTagsSet.add(t));
+        currentBlock = { type: 'tags', lines: [tagsList.join(' ')] };
         blocks.push(currentBlock);
       } else {
         if (!currentBlock.tags) currentBlock.tags = [];
-        currentBlock.tags.push(trimmed);
+        // Filter out duplicate feature tags from scenario level (rule: no-dupe-feature-scenario-tags)
+        tagsList.forEach(t => {
+          if (!featureTagsSet.has(t)) {
+            currentBlock.tags.push(t);
+          }
+        });
       }
       continue;
     }
@@ -281,7 +285,6 @@ function reconstructDocumentStructure(code, _activeRules = new Set()) {
             currentBlock.examples.rows.push(cells);
           }
         } else {
-          // Description lines inside Examples block
           currentBlock.examples.description.push(trimmed);
         }
       } else {
@@ -299,10 +302,10 @@ function reconstructDocumentStructure(code, _activeRules = new Set()) {
 
   // Fallback main feature title if none existed
   if (!mainFeatureTitle) {
-    mainFeatureTitle = 'Merchant Support Portal & Feature Specification';
+    mainFeatureTitle = 'User Feature Specification';
   }
 
-  // 2. Output Re-construction
+  // Output Re-construction
   const outputLines = [];
 
   // Primary Feature Header
@@ -312,7 +315,7 @@ function reconstructDocumentStructure(code, _activeRules = new Set()) {
   });
   outputLines.push('');
 
-  // Primary Background Block (must come under Feature before Rules/Scenarios)
+  // Background Block
   if (backgroundBlock) {
     outputLines.push(`  Background:${backgroundBlock.title ? ' ' + backgroundBlock.title : ''}`);
     processStepBlockLines(backgroundBlock.lines, outputLines, '    ');
@@ -324,37 +327,22 @@ function reconstructDocumentStructure(code, _activeRules = new Set()) {
 
   blocks.forEach(block => {
     if (block.type === 'tags') {
-      block.lines.forEach(t => {
-        const formattedTag = t.split(/\s+/).map(tag => {
-          if (!tag.startsWith('@')) return tag;
-          return '@' + tag.slice(1).toLowerCase().replace(/[^a-z0-9-]/g, '-');
-        }).join(' ');
-        outputLines.push(`  ${formattedTag}`);
-      });
+      block.lines.forEach(t => outputLines.push(`  ${t.trim()}`));
       return;
     }
 
     if (block.type === 'rule') {
       outputLines.push(`\n  Rule: ${block.title}`);
       if (block.description && block.description.length > 0) {
-        block.description.forEach(descLine => {
-          outputLines.push(`    ${descLine}`);
-        });
+        block.description.forEach(descLine => outputLines.push(`    ${descLine}`));
         outputLines.push('');
       }
       return;
     }
 
     if (block.type === 'scenario' || block.type === 'outline') {
-      // Print scenario tags if attached
       if (block.tags && block.tags.length > 0) {
-        block.tags.forEach(t => {
-          const formattedTag = t.split(/\s+/).map(tag => {
-            if (!tag.startsWith('@')) return tag;
-            return '@' + tag.slice(1).toLowerCase().replace(/[^a-z0-9-]/g, '-');
-          }).join(' ');
-          outputLines.push(`  ${formattedTag}`);
-        });
+        outputLines.push(`  ${block.tags.join(' ')}`);
       }
 
       // De-duplicate Scenario Names (rule: no-dupe-scenario-names)
@@ -383,14 +371,12 @@ function reconstructDocumentStructure(code, _activeRules = new Set()) {
 
         let headerCols = [...examples.header];
 
-        // Ensure all step placeholders exist in header
         phList.forEach(ph => {
           if (!headerCols.includes(ph)) {
             headerCols.push(ph);
           }
         });
 
-        // Default headers if no placeholders and no headers existed
         if (headerCols.length === 0) {
           headerCols = ['param1', 'param2'];
         }
@@ -402,7 +388,6 @@ function reconstructDocumentStructure(code, _activeRules = new Set()) {
 
         outputLines.push(`      | ${headerCols.join(' | ')} |`);
 
-        // Format data rows
         if (examples.rows.length > 0) {
           examples.rows.forEach(row => {
             let updatedRow = [...row];
@@ -416,7 +401,6 @@ function reconstructDocumentStructure(code, _activeRules = new Set()) {
             outputLines.push(`      | ${updatedRow.join(' | ')} |`);
           });
         } else {
-          // Generate default data row
           const defaultRow = headerCols.map(h => `${h}_val`);
           outputLines.push(`      | ${defaultRow.join(' | ')} |`);
         }
@@ -434,6 +418,7 @@ function reconstructDocumentStructure(code, _activeRules = new Set()) {
  * - Fixes dangling conjunctions (starts with And/But -> Given)
  * - Fixes repeated keywords (Given...Given -> Given...And)
  * - Re-orders steps into logical Given -> When -> Then flow
+ * - Refactors first-person & imperative steps
  * - Strips ending punctuation from steps
  * - Formats table rows & normalizes column counts
  */
@@ -456,12 +441,18 @@ function processStepBlockLines(lines, outputArr, indent, onPlaceholderFound) {
       let kw = rawKw === '*' ? '*' : rawKw.charAt(0).toUpperCase() + rawKw.slice(1);
       let text = stepMatch[2].trim();
 
-      // Fix ending punctuation on step text
+      // Rule: no-ending-punctuation
       if (/[.,;:]$/.test(text)) {
         text = text.slice(0, -1).trim();
       }
 
-      // Rule: dangling-conjunction (And/But without preceding Given/When/Then)
+      // Rule: no-first-person-perspective
+      text = refactorFirstPerson(text);
+
+      // Rule: imperative-steps-warning
+      text = refactorImperativeStep(text);
+
+      // Rule: dangling-conjunction
       if ((kw === 'And' || kw === 'But') && !lastMainKw) {
         kw = 'Given';
       }
@@ -484,7 +475,7 @@ function processStepBlockLines(lines, outputArr, indent, onPlaceholderFound) {
       const dQuotes = (text.match(/"/g) || []).length;
       if (dQuotes % 2 !== 0) text += '"';
 
-      // Fix unclosed single quotes (ignoring possessive/contraction apostrophes like merchant's)
+      // Fix unclosed single quotes
       const codeQuotesOnly = text.replace(/[a-zA-Z]'[a-zA-Z]/g, '');
       const sQuotes = (codeQuotesOnly.match(/'/g) || []).length;
       if (sQuotes % 2 !== 0) text += "'";
@@ -534,11 +525,10 @@ function processStepBlockLines(lines, outputArr, indent, onPlaceholderFound) {
     }
   }
 
-  // Output steps in their original natural sequence to preserve scenario flow
+  // Output steps in natural sequence
   steps.forEach(step => {
     outputArr.push(`${indent}${step.keyword} ${step.text}`);
 
-    // Format & normalize data tables
     if (step.tables && step.tables.length > 0) {
       let maxCols = 0;
       step.tables.forEach(row => {
@@ -554,7 +544,6 @@ function processStepBlockLines(lines, outputArr, indent, onPlaceholderFound) {
       });
     }
 
-    // Format DocStrings
     if (step.docstrings && step.docstrings.length > 0) {
       step.docstrings.forEach(dLine => {
         const t = dLine.trim();
@@ -566,6 +555,44 @@ function processStepBlockLines(lines, outputArr, indent, onPlaceholderFound) {
       });
     }
   });
+}
+
+/**
+ * Refactor First-Person "I" / "my" to third-person role phrasing
+ */
+function refactorFirstPerson(text) {
+  if (!text) return text;
+  return text
+    .replace(/\bI am\b/g, 'the user is')
+    .replace(/\bI authenticated\b/g, 'the user is authenticated')
+    .replace(/\bmy account balance\b/g, 'the account balance')
+    .replace(/\bmy account\b/g, 'the user account')
+    .replace(/\bI insert\b/g, 'the user inserts')
+    .replace(/\bI enter\b/g, 'the user enters')
+    .replace(/\bI press\b/g, 'the user presses')
+    .replace(/\bI get\b/g, 'the user receives')
+    .replace(/\bI navigate\b/g, 'the user navigates')
+    .replace(/\bI open\b/g, 'the user opens')
+    .replace(/\bI\b/g, 'the user')
+    .replace(/\bmy\b/g, 'the');
+}
+
+/**
+ * Refactor Low-Level Procedural UI Steps into Declarative Intent Steps
+ */
+function refactorImperativeStep(text) {
+  if (!text) return text;
+  let refactored = text;
+  refactored = refactored.replace(/opens (a |the )?(web )?browser/i, 'the application is opened');
+  refactored = refactored.replace(/navigates to "https?:\/\/[^"]+"/i, 'the main page is displayed');
+  refactored = refactored.replace(/enters? "([^"]+)" into the search bar/i, 'searches for "$1"');
+  refactored = refactored.replace(/types? "([^"]+)" into (the |a )?([a-zA-Z0-9_-]+) (field|input)/i, 'enters "$1" for $3');
+  refactored = refactored.replace(/clicks? (on )?(the )?"([^"]+)" (link|button)/i, 'selects "$3"');
+  refactored = refactored.replace(/presses? (the )?confirm PIN button/i, 'confirms the PIN');
+  refactored = refactored.replace(/presses? (the )?withdrawal button/i, 'selects withdrawal');
+  refactored = refactored.replace(/presses? confirm/i, 'submits the request');
+  refactored = refactored.replace(/on the keypad/i, '');
+  return refactored.replace(/\s+/g, ' ').trim();
 }
 
 /**
@@ -621,6 +648,7 @@ function formatAndStructureGherkin(code) {
 
 /**
  * Fix a single targeted line in Gherkin text given line number and error detail.
+ * Specifically handles both Errors and Warning rules!
  */
 export function fixSingleLine(code, lineNum, errorDetail) {
   if (!code) return code;
@@ -644,26 +672,65 @@ export function fixSingleLine(code, lineNum, errorDetail) {
     return lines.join('\n');
   }
 
-  // Rule 3: Unclosed double quotes
+  // Rule 3: First-person "I" / "my"
+  if (errorDetail?.rule === 'no-first-person-perspective' || /\b(I|my)\b/.test(trimmed)) {
+    const stepMatch = trimmed.match(/^(given|when|then|and|but|\*)\b\s*(.*)/i);
+    if (stepMatch) {
+      const kw = stepMatch[1];
+      const fixedText = refactorFirstPerson(stepMatch[2]);
+      lines[index] = `    ${kw} ${fixedText}`;
+      return lines.join('\n');
+    }
+  }
+
+  // Rule 4: Imperative steps warning
+  if (errorDetail?.rule === 'imperative-steps-warning') {
+    const stepMatch = trimmed.match(/^(given|when|then|and|but|\*)\b\s*(.*)/i);
+    if (stepMatch) {
+      const kw = stepMatch[1];
+      const fixedText = refactorImperativeStep(stepMatch[2]);
+      lines[index] = `    ${kw} ${fixedText}`;
+      return lines.join('\n');
+    }
+  }
+
+  // Rule 5: Tag convention
+  if (errorDetail?.rule === 'tag-convention' || trimmed.startsWith('@')) {
+    const parts = trimmed.split(/\s+/);
+    const cleaned = parts.map(tag => {
+      if (!tag.startsWith('@')) return tag;
+      return '@' + tag.slice(1).toLowerCase().replace(/[^a-z0-9-]/g, '-');
+    }).join(' ');
+    lines[index] = '  ' + cleaned;
+    return lines.join('\n');
+  }
+
+  // Rule 6: Consecutive keyword repeat (use-and)
+  if (errorDetail?.rule === 'use-and') {
+    lines[index] = line.replace(/^(Given|When|Then)\b/i, 'And');
+    return lines.join('\n');
+  }
+
+  // Rule 7: Unclosed double quotes
   if (errorDetail?.rule === 'unclosed-double-quote' || (trimmed.match(/"/g) || []).length % 2 !== 0) {
     lines[index] = line + '"';
     return lines.join('\n');
   }
 
-  // Rule 4: Unclosed single quotes (ignoring possessive apostrophes like merchant's)
+  // Rule 8: Unclosed single quotes
   const codeQuotesOnly = trimmed.replace(/[a-zA-Z]'[a-zA-Z]/g, '');
   if (errorDetail?.rule === 'unclosed-single-quote' || (codeQuotesOnly.match(/'/g) || []).length % 2 !== 0) {
     lines[index] = line + "'";
     return lines.join('\n');
   }
 
-  // Rule 5: Table row pipe unclosed
+  // Rule 9: Table row pipe unclosed
   if (errorDetail?.rule === 'table-row-pipe-unclosed' || (trimmed.startsWith('|') && !trimmed.endsWith('|'))) {
     lines[index] = line + ' |';
     return lines.join('\n');
   }
 
-  // Rule 6: Indentation warnings
+  // Rule 10: Indentation warnings
   if (errorDetail?.rule === 'indentation' || errorDetail?.category?.includes('Indentation')) {
     if (trimmed.startsWith('Feature:')) {
       lines[index] = trimmed;
