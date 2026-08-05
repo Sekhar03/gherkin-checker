@@ -2,7 +2,7 @@ import React, { useEffect } from 'react';
 import confetti from 'canvas-confetti';
 import { CheckCircle2, XCircle, AlertTriangle, ExternalLink, Lightbulb, Wrench, FileCode, Tag, Play, ShieldCheck } from 'lucide-react';
 
-export function AnalysisDashboard({ results, isTested, onRunTest, onHighlightLine }) {
+export function AnalysisDashboard({ results, isTested, onRunTest, onHighlightLine, onAutoFix, onFixLine }) {
   const { overallPass, totalErrors, totalWarnings, checkers } = results || {
     overallPass: false,
     totalErrors: 0,
@@ -89,8 +89,16 @@ export function AnalysisDashboard({ results, isTested, onRunTest, onHighlightLin
           <p className="banner-desc">
             {overallPass
               ? 'Your Gherkin feature file satisfies @cucumber/gherkin AST specs, gherkin-lint quality standards, Matriz88 step consistency, and sistar lexing structure.'
-              : `Detected ${totalErrors} error${totalErrors === 1 ? '' : 's'} and ${totalWarnings} warning${totalWarnings === 1 ? '' : 's'}. Review the detailed failure reasons and suggested fixes below.`}
+              : `Detected ${totalErrors} error${totalErrors === 1 ? '' : 's'} and ${totalWarnings} warning${totalWarnings === 1 ? '' : 's'}. Click "Auto-Fix All Issues" to repair them automatically.`}
           </p>
+
+          {!overallPass && onAutoFix && (
+            <div className="banner-action-row">
+              <button onClick={onAutoFix} className="btn-banner-autofix">
+                <Wrench size={16} /> Auto-Fix All Errors & Warnings
+              </button>
+            </div>
+          )}
         </div>
       </div>
 
@@ -153,6 +161,19 @@ export function AnalysisDashboard({ results, isTested, onRunTest, onHighlightLin
                             rule: {err.rule}
                           </span>
                         )}
+
+                        {onFixLine && (
+                          <button
+                            className="btn-fix-single-line"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              onFixLine(err.line, err);
+                            }}
+                            title={`Fix issue on Line ${err.line}`}
+                          >
+                            <Wrench size={11} /> Fix Line
+                          </button>
+                        )}
                       </div>
 
                       {err.text !== undefined && (
@@ -194,6 +215,19 @@ export function AnalysisDashboard({ results, isTested, onRunTest, onHighlightLin
                         <span className="line-badge warning">Line {warn.line}</span>
                         {warn.category && <span className="category-badge warning">{warn.category}</span>}
                         {warn.rule && <span className="rule-badge warning">{warn.rule}</span>}
+
+                        {onFixLine && (
+                          <button
+                            className="btn-fix-single-line warning"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              onFixLine(warn.line, warn);
+                            }}
+                            title={`Fix warning on Line ${warn.line}`}
+                          >
+                            <Wrench size={11} /> Fix Line
+                          </button>
+                        )}
                       </div>
 
                       {warn.text && (

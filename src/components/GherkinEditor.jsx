@@ -1,7 +1,7 @@
 import React, { useRef } from 'react';
-import { Upload, Download, Copy, Trash2, FileText, AlertCircle, AlertTriangle, Play, Zap } from 'lucide-react';
+import { Upload, Download, Copy, Trash2, FileText, AlertCircle, AlertTriangle, Play, Zap, Wrench } from 'lucide-react';
 
-export function GherkinEditor({ code, onChange, onRunTest, errorsByLine = {}, isTested }) {
+export function GherkinEditor({ code, onChange, onRunTest, onAutoFix, errorsByLine = {}, isTested, hasIssues }) {
   const fileInputRef = useRef(null);
   const textareaRef = useRef(null);
 
@@ -47,6 +47,16 @@ export function GherkinEditor({ code, onChange, onRunTest, errorsByLine = {}, is
         </div>
 
         <div className="editor-actions">
+          {/* Auto-Fix Button */}
+          <button
+            onClick={onAutoFix}
+            className={`btn-action ${isTested && hasIssues ? 'btn-autofix-active' : ''}`}
+            disabled={!code.trim()}
+            title="Read errors & warnings and automatically fix Gherkin code"
+          >
+            <Wrench size={14} /> Auto-Fix
+          </button>
+
           {/* Prominent Test / Analyze Button */}
           <button
             onClick={onRunTest}

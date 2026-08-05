@@ -1121,3 +1121,120 @@ body {
   transform: translateY(-1px);
   box-shadow: 0 4px 12px rgba(79, 70, 229, 0.25);
 }
+
+/* ==========================================================================
+   AUTO-FIX BUTTONS & TOAST NOTIFICATIONS
+   ========================================================================== */
+
+.toast-notice {
+  position: fixed;
+  top: 1.5rem;
+  right: 1.5rem;
+  z-index: 9999;
+  background: linear-gradient(135deg, #10b981, #059669);
+  color: #ffffff;
+  padding: 0.75rem 1.25rem;
+  border-radius: 12px;
+  font-size: 0.85rem;
+  font-weight: 700;
+  box-shadow: 0 10px 25px rgba(16, 185, 129, 0.4);
+  animation: slideInToast 0.3s ease-out;
+}
+
+@keyframes slideInToast {
+  from { transform: translateY(-20px); opacity: 0; }
+  to { transform: translateY(0); opacity: 1; }
+}
+
+.btn-autofix-header {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.45rem;
+  background: linear-gradient(135deg, #f59e0b, #d97706);
+  color: #ffffff;
+  border: none;
+  padding: 0.45rem 0.95rem;
+  border-radius: 20px;
+  font-size: 0.8rem;
+  font-weight: 700;
+  cursor: pointer;
+  box-shadow: 0 4px 14px rgba(245, 158, 11, 0.35);
+  transition: all 0.25s ease;
+  animation: pulseFix 2.5s infinite ease-in-out;
+}
+
+.btn-autofix-header:hover {
+  transform: translateY(-1px) scale(1.03);
+  box-shadow: 0 6px 18px rgba(245, 158, 11, 0.5);
+}
+
+@keyframes pulseFix {
+  0% { box-shadow: 0 0 0 0 rgba(245, 158, 11, 0.4); }
+  70% { box-shadow: 0 0 0 8px rgba(245, 158, 11, 0); }
+  100% { box-shadow: 0 0 0 0 rgba(245, 158, 11, 0); }
+}
+
+.btn-action.btn-autofix-active {
+  background: linear-gradient(135deg, #f59e0b, #d97706);
+  color: #ffffff;
+  border-color: #f59e0b;
+  font-weight: 700;
+}
+
+.banner-action-row {
+  margin-top: 0.75rem;
+}
+
+.btn-banner-autofix {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  background: linear-gradient(135deg, #dc2626, #b91c1c);
+  color: #ffffff;
+  border: none;
+  padding: 0.5rem 1.1rem;
+  border-radius: 10px;
+  font-size: 0.835rem;
+  font-weight: 800;
+  cursor: pointer;
+  box-shadow: 0 4px 16px rgba(220, 38, 38, 0.35);
+  transition: all 0.25s ease;
+}
+
+.btn-banner-autofix:hover {
+  transform: translateY(-1px) scale(1.02);
+  box-shadow: 0 6px 20px rgba(220, 38, 38, 0.5);
+}
+
+.btn-fix-single-line {
+  margin-left: auto;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
+  background: var(--fail-red-bg);
+  border: 1px solid var(--fail-red-border);
+  color: var(--fail-red);
+  padding: 0.18rem 0.55rem;
+  border-radius: 6px;
+  font-size: 0.7rem;
+  font-weight: 700;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.btn-fix-single-line:hover {
+  background: var(--fail-red);
+  color: #ffffff;
+}
+
+.btn-fix-single-line.warning {
+  background: var(--amber-warn-bg);
+  border-color: var(--amber-warn-border);
+  color: var(--amber-warn);
+}
+
+.btn-fix-single-line.warning:hover {
+  background: var(--amber-warn);
+  color: #ffffff;
+}
+

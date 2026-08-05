@@ -1,8 +1,8 @@
 import React from 'react';
-import { ShieldCheck, Github, Sparkles, CheckCircle2, AlertTriangle, Play, Sun, Moon } from 'lucide-react';
+import { ShieldCheck, Github, Sparkles, CheckCircle2, AlertTriangle, Play, Sun, Moon, Wrench } from 'lucide-react';
 import { SAMPLES } from '../utils/samples';
 
-export function Header({ theme, onToggleTheme, currentSampleId, onSelectSample, totalErrors, totalWarnings, overallPass, executionTimeMs, isTested }) {
+export function Header({ theme, onToggleTheme, currentSampleId, onSelectSample, totalErrors, totalWarnings, overallPass, executionTimeMs, isTested, onAutoFix, hasIssues }) {
   const repos = [
     { name: 'gherkin-lint', url: 'https://github.com/gherkin-lint/gherkin-lint', tag: 'Linter Rules' },
     { name: '@cucumber/gherkin', url: 'https://github.com/cucumber/gherkin-javascript', tag: 'Cucumber AST Parser' },
@@ -26,6 +26,17 @@ export function Header({ theme, onToggleTheme, currentSampleId, onSelectSample, 
         </div>
 
         <div className="header-right-group">
+          {isTested && hasIssues && (
+            <button
+              onClick={onAutoFix}
+              className="btn-autofix-header"
+              title="Automatically read errors & warnings and fix Gherkin syntax, keywords, & formatting"
+            >
+              <Wrench size={15} />
+              <span>Auto-Fix All Issues</span>
+            </button>
+          )}
+
           <button
             onClick={onToggleTheme}
             className="theme-toggle-btn"
