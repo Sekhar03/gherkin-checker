@@ -1,7 +1,7 @@
 import React, { useRef } from 'react';
-import { Upload, Download, Copy, Trash2, FileText, AlertCircle, AlertTriangle, Play, Zap, Wrench } from 'lucide-react';
+import { Upload, Download, Copy, Trash2, FileText, AlertCircle, AlertTriangle, Play, Zap, Bot, Loader2 } from 'lucide-react';
 
-export function GherkinEditor({ code, onChange, onRunTest, onAutoFix, errorsByLine = {}, isTested, hasIssues }) {
+export function GherkinEditor({ code, onChange, onRunTest, onAutoFix, isFixingWithAI, errorsByLine = {}, isTested, hasIssues }) {
   const fileInputRef = useRef(null);
   const textareaRef = useRef(null);
 
@@ -47,14 +47,15 @@ export function GherkinEditor({ code, onChange, onRunTest, onAutoFix, errorsByLi
         </div>
 
         <div className="editor-actions">
-          {/* Auto-Fix Button */}
+          {/* Claude AI Auto-Fix Button */}
           <button
             onClick={onAutoFix}
-            className={`btn-action ${isTested && hasIssues ? 'btn-autofix-active' : ''}`}
-            disabled={!code.trim()}
-            title="Read errors & warnings and automatically fix Gherkin code"
+            className={`btn-action ${isTested && hasIssues ? 'btn-autofix-active btn-claude-editor' : ''}`}
+            disabled={!code.trim() || isFixingWithAI}
+            title="Claude AI reads all 4 checker errors and automatically fixes Gherkin code"
           >
-            <Wrench size={14} /> Auto-Fix
+            {isFixingWithAI ? <Loader2 size={14} className="spin-icon" /> : <Bot size={14} />}
+            <span>{isFixingWithAI ? 'Fixing with Claude...' : 'Claude AI Fix'}</span>
           </button>
 
           {/* Prominent Test / Analyze Button */}

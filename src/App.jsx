@@ -3,9 +3,11 @@ import { Header } from './components/Header';
 import { GherkinEditor } from './components/GherkinEditor';
 import { AnalysisDashboard } from './components/AnalysisDashboard';
 import { ReportExporter } from './components/ReportExporter';
+import { AISettingsModal } from './components/AISettingsModal';
 import { SAMPLES } from './utils/samples';
 import { runAllCheckers } from './validators/masterRunner';
 import { autoFixGherkin, fixSingleLine } from './utils/autoFixer';
+import { fixGherkinWithClaudeAI } from './utils/aiFixer';
 import './index.css';
 
 export default function App() {
@@ -18,6 +20,12 @@ export default function App() {
   const [analysisResults, setAnalysisResults] = useState(null);
   const [fixNotice, setFixNotice] = useState(null);
 
+  // Claude AI state
+  const [isFixingWithAI, setIsFixingWithAI] = useState(false);
+  const [isAISettingsOpen, setIsAISettingsOpen] = useState(false);
+  const [claudeApiKey, setClaudeApiKey] = useState(() => localStorage.getItem('claude_api_key') || '');
+  const [claudeProvider, setClaudeProvider] = useState(() => localStorage.getItem('claude_provider') || 'anthropic');
+
   useEffect(() => {
     document.documentElement.setAttribute('data-theme', theme);
     localStorage.setItem('gherkin_theme', theme);
@@ -27,18 +35,52 @@ export default function App() {
     setTheme(prev => (prev === 'light' ? 'dark' : 'light'));
   };
 
+  const handleSaveApiKey = (key) => {
+    setClaudeApiKey(key);
+    localStorage.setItem('claude_api_key', key);
+  };
+
+  const handleSaveProvider = (provider) => {
+    setClaudeProvider(provider);
+    localStorage.setItem('claude_provider', provider);
+  };
+
   const handleRunTest = (codeToTest = code) => {
     const results = runAllCheckers(codeToTest);
     setAnalysisResults(results);
     setIsTested(true);
   };
 
+  const handleClaudeAutoFix = async () => {
+    if (!code || !code.trim()) return;
+
+    setIsFixingWithAI(true);
+    try {
+      const fixedCode = await fixGherkinWithClaudeAI({
+        code,
+        results: analysisResults,
+        apiKey: claudeApiKey,
+        apiProvider: claudeProvider
+      });
+
+      setCode(fixedCode);
+      handleRunTest(fixedCode);
+      setFixNotice('🤖 Claude AI analyzed all 4 checkers and fixed your Gherkin feature file!');
+    } catch (err) {
+      console.error('Claude AI Fix Error:', err);
+      // Fallback auto fix
+      const fallbackFixed = autoFixGherkin(code);
+      setCode(fallbackFixed);
+      handleRunTest(fallbackFixed);
+      setFixNotice('✨ Auto-Fix applied! All syntax and indentations repaired.');
+    } finally {
+      setIsFixingWithAI(false);
+      setTimeout(() => setFixNotice(null), 4500);
+    }
+  };
+
   const handleAutoFix = () => {
-    const fixed = autoFixGherkin(code);
-    setCode(fixed);
-    handleRunTest(fixed);
-    setFixNotice('✨ Auto-Fix applied! All syntax, keywords, and indentations repaired.');
-    setTimeout(() => setFixNotice(null), 4000);
+    handleClaudeAutoFix();
   };
 
   const handleFixSingleLine = (lineNum, errorDetail) => {
@@ -84,7 +126,9 @@ export default function App() {
         overallPass={analysisResults?.overallPass || false}
         executionTimeMs={analysisResults?.executionTimeMs || '0.00'}
         isTested={isTested}
-        onAutoFix={handleAutoFix}
+        onAutoFix={handleClaudeAutoFix}
+        onOpenAISettings={() => setIsAISettingsOpen(true)}
+        isFixingWithAI={isFixingWithAI}
         hasIssues={(analysisResults?.totalErrors || 0) > 0 || (analysisResults?.totalWarnings || 0) > 0}
       />
 
@@ -94,7 +138,8 @@ export default function App() {
           code={code}
           onChange={handleCodeChange}
           onRunTest={() => handleRunTest(code)}
-          onAutoFix={handleAutoFix}
+          onAutoFix={handleClaudeAutoFix}
+          isFixingWithAI={isFixingWithAI}
           errorsByLine={analysisResults?.errorsByLine || {}}
           isTested={isTested}
           hasIssues={(analysisResults?.totalErrors || 0) > 0 || (analysisResults?.totalWarnings || 0) > 0}
@@ -104,8 +149,9 @@ export default function App() {
           results={analysisResults}
           isTested={isTested}
           onRunTest={() => handleRunTest(code)}
-          onAutoFix={handleAutoFix}
+          onAutoFix={handleClaudeAutoFix}
           onFixLine={handleFixSingleLine}
+          isFixingWithAI={isFixingWithAI}
         />
       </main>
 
@@ -116,6 +162,16 @@ export default function App() {
           code={code}
         />
       )}
+
+      {/* AI Settings Modal */}
+      <AISettingsModal
+        isOpen={isAISettingsOpen}
+        onClose={() => setIsAISettingsOpen(false)}
+        apiKey={claudeApiKey}
+        onSaveApiKey={handleSaveApiKey}
+        apiProvider={claudeProvider}
+        onSaveProvider={handleSaveProvider}
+      />
     </div>
   );
 }

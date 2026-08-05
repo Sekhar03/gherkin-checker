@@ -1,8 +1,8 @@
 import React, { useEffect } from 'react';
 import confetti from 'canvas-confetti';
-import { CheckCircle2, XCircle, AlertTriangle, ExternalLink, Lightbulb, Wrench, FileCode, Tag, Play, ShieldCheck } from 'lucide-react';
+import { CheckCircle2, XCircle, AlertTriangle, ExternalLink, Lightbulb, Wrench, FileCode, Tag, Play, ShieldCheck, Bot, Loader2 } from 'lucide-react';
 
-export function AnalysisDashboard({ results, isTested, onRunTest, onHighlightLine, onAutoFix, onFixLine }) {
+export function AnalysisDashboard({ results, isTested, onRunTest, onHighlightLine, onAutoFix, onFixLine, isFixingWithAI }) {
   const { overallPass, totalErrors, totalWarnings, checkers } = results || {
     overallPass: false,
     totalErrors: 0,
@@ -89,13 +89,14 @@ export function AnalysisDashboard({ results, isTested, onRunTest, onHighlightLin
           <p className="banner-desc">
             {overallPass
               ? 'Your Gherkin feature file satisfies @cucumber/gherkin AST specs, gherkin-lint quality standards, Matriz88 step consistency, and sistar lexing structure.'
-              : `Detected ${totalErrors} error${totalErrors === 1 ? '' : 's'} and ${totalWarnings} warning${totalWarnings === 1 ? '' : 's'}. Click "Auto-Fix All Issues" to repair them automatically.`}
+              : `Detected ${totalErrors} error${totalErrors === 1 ? '' : 's'} and ${totalWarnings} warning${totalWarnings === 1 ? '' : 's'}. Click "Fix with Claude AI" to let AI read all checker errors and rewrite Gherkin.`}
           </p>
 
           {!overallPass && onAutoFix && (
             <div className="banner-action-row">
-              <button onClick={onAutoFix} className="btn-banner-autofix">
-                <Wrench size={16} /> Auto-Fix All Errors & Warnings
+              <button onClick={onAutoFix} disabled={isFixingWithAI} className="btn-banner-autofix btn-claude-banner">
+                {isFixingWithAI ? <Loader2 size={16} className="spin-icon" /> : <Bot size={18} />}
+                <span>{isFixingWithAI ? 'Claude AI Analyzing & Fixing...' : 'Fix with Claude AI'}</span>
               </button>
             </div>
           )}

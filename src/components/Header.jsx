@@ -1,8 +1,8 @@
 import React from 'react';
-import { ShieldCheck, Github, Sparkles, CheckCircle2, AlertTriangle, Play, Sun, Moon, Wrench } from 'lucide-react';
+import { ShieldCheck, Github, Sparkles, CheckCircle2, AlertTriangle, Play, Sun, Moon, Bot, Settings, Loader2 } from 'lucide-react';
 import { SAMPLES } from '../utils/samples';
 
-export function Header({ theme, onToggleTheme, currentSampleId, onSelectSample, totalErrors, totalWarnings, overallPass, executionTimeMs, isTested, onAutoFix, hasIssues }) {
+export function Header({ theme, onToggleTheme, currentSampleId, onSelectSample, totalErrors, totalWarnings, overallPass, executionTimeMs, isTested, onAutoFix, onOpenAISettings, isFixingWithAI, hasIssues }) {
   const repos = [
     { name: 'gherkin-lint', url: 'https://github.com/gherkin-lint/gherkin-lint', tag: 'Linter Rules' },
     { name: '@cucumber/gherkin', url: 'https://github.com/cucumber/gherkin-javascript', tag: 'Cucumber AST Parser' },
@@ -29,13 +29,23 @@ export function Header({ theme, onToggleTheme, currentSampleId, onSelectSample, 
           {isTested && hasIssues && (
             <button
               onClick={onAutoFix}
-              className="btn-autofix-header"
-              title="Automatically read errors & warnings and fix Gherkin syntax, keywords, & formatting"
+              disabled={isFixingWithAI}
+              className="btn-autofix-header btn-claude-ai"
+              title="Use Claude AI to analyze all 4 checker errors and automatically rewrite Gherkin"
             >
-              <Wrench size={15} />
-              <span>Auto-Fix All Issues</span>
+              {isFixingWithAI ? <Loader2 size={15} className="spin-icon" /> : <Bot size={16} />}
+              <span>{isFixingWithAI ? 'Claude AI Repairing...' : 'Fix with Claude AI'}</span>
             </button>
           )}
+
+          <button
+            onClick={onOpenAISettings}
+            className="theme-toggle-btn btn-ai-settings"
+            title="Configure Anthropic Claude API Key / AI Settings"
+          >
+            <Settings size={15} />
+            <span>AI Key</span>
+          </button>
 
           <button
             onClick={onToggleTheme}
