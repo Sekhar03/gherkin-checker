@@ -29,7 +29,6 @@ export function checkMatrizConsistency(gherkinText) {
   }
 
   const lines = gherkinText.split('\n');
-  let currentScenarioName = null;
   let currentScenarioLine = null;
   let inScenarioOutline = false;
   let scenarioOutlinePlaceholders = new Set();
@@ -46,7 +45,6 @@ export function checkMatrizConsistency(gherkinText) {
 
     // Detect Scenario / Scenario Outline
     if (trimmedLine.startsWith('Scenario:') || trimmedLine.startsWith('Scenario Outline:') || trimmedLine.startsWith('Scenario Template:')) {
-      currentScenarioName = trimmedLine;
       currentScenarioLine = lineNum;
       inScenarioOutline = trimmedLine.startsWith('Scenario Outline:') || trimmedLine.startsWith('Scenario Template:');
       scenarioOutlinePlaceholders.clear();
@@ -142,7 +140,7 @@ export function checkMatrizConsistency(gherkinText) {
     if (trimmedLine.startsWith('@')) {
       const tags = trimmedLine.split(/\s+/);
       tags.forEach(tag => {
-        if (tag === '@' || /^@[^a-zA-Z0-9_\-]/.test(tag)) {
+        if (tag === '@' || /^@[^a-zA-Z0-9_-]/.test(tag)) {
           result.pass = false;
           result.errors.push({
             line: lineNum,

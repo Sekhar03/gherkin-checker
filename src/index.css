@@ -1460,5 +1460,309 @@ body {
   box-shadow: 0 4px 12px rgba(124, 58, 237, 0.3);
 }
 
+/* ==========================================================================
+   GHERKIN QUALITY METRICS & BDD REVIEW CHECKLIST STYLES
+   ========================================================================== */
 
+.metrics-overview-bar {
+  display: grid;
+  grid-template-columns: 240px 1fr;
+  gap: 1rem;
+  background: var(--bg-card);
+  border: 1px solid var(--border-color);
+  border-radius: 12px;
+  padding: 1rem 1.25rem;
+  box-shadow: var(--card-shadow);
+}
 
+@media (max-width: 768px) {
+  .metrics-overview-bar {
+    grid-template-columns: 1fr;
+  }
+}
+
+.quality-score-card {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+  padding-right: 1.25rem;
+  border-right: 1px solid var(--border-color);
+}
+
+@media (max-width: 768px) {
+  .quality-score-card {
+    border-right: none;
+    border-bottom: 1px solid var(--border-color);
+    padding-right: 0;
+    padding-bottom: 0.75rem;
+  }
+}
+
+.score-header {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  font-size: 0.765rem;
+  font-weight: 700;
+  color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.score-icon {
+  color: var(--purple-accent);
+}
+
+.score-value {
+  font-size: 1.85rem;
+  font-weight: 800;
+  font-family: 'Outfit', sans-serif;
+  line-height: 1.1;
+  display: flex;
+  align-items: baseline;
+  gap: 0.25rem;
+}
+
+.score-value.score-high { color: var(--pass-green); }
+.score-value.score-med { color: var(--amber-warn); }
+.score-value.score-low { color: var(--fail-red); }
+
+.score-max {
+  font-size: 0.85rem;
+  font-weight: 600;
+  color: var(--text-subtle);
+}
+
+.score-progress-bg {
+  height: 6px;
+  background: var(--bg-subtle);
+  border-radius: 999px;
+  overflow: hidden;
+  margin-top: 0.2rem;
+}
+
+.score-progress-fill {
+  height: 100%;
+  border-radius: 999px;
+  transition: width 0.4s ease;
+}
+
+.score-progress-fill.score-high { background: var(--pass-green); }
+.score-progress-fill.score-med { background: var(--amber-warn); }
+.score-progress-fill.score-low { background: var(--fail-red); }
+
+.quick-metrics-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(110px, 1fr));
+  gap: 0.75rem;
+  align-items: center;
+}
+
+.metric-pill {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  background: var(--bg-inset);
+  border: 1px solid var(--border-color);
+  padding: 0.5rem 0.75rem;
+  border-radius: 10px;
+}
+
+.metric-icon {
+  color: var(--blue-accent);
+}
+
+.metric-info {
+  display: flex;
+  flex-direction: column;
+}
+
+.metric-val {
+  font-size: 0.95rem;
+  font-weight: 800;
+  line-height: 1.2;
+  color: var(--text-main);
+}
+
+.metric-lbl {
+  font-size: 0.685rem;
+  color: var(--text-muted);
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.dashboard-tabs {
+  display: flex;
+  gap: 0.5rem;
+  border-bottom: 1px solid var(--border-color);
+  padding-bottom: 0.25rem;
+  margin-top: 0.5rem;
+}
+
+.dash-tab-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  background: transparent;
+  border: none;
+  border-bottom: 2px solid transparent;
+  padding: 0.5rem 0.85rem;
+  font-size: 0.825rem;
+  font-weight: 600;
+  color: var(--text-muted);
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.dash-tab-btn:hover {
+  color: var(--text-main);
+}
+
+.dash-tab-btn.active {
+  color: var(--blue-accent);
+  border-bottom-color: var(--blue-accent);
+}
+
+/* Checklist Container */
+.checklist-container, .metrics-detailed-container {
+  background: var(--bg-card);
+  border: 1px solid var(--border-color);
+  border-radius: 14px;
+  padding: 1.25rem;
+  box-shadow: var(--card-shadow);
+}
+
+.checklist-header, .metrics-header {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  margin-bottom: 1rem;
+  padding-bottom: 0.75rem;
+  border-bottom: 1px solid var(--border-color);
+  color: var(--blue-accent);
+}
+
+.checklist-header h3, .metrics-header h3 {
+  font-size: 1.05rem;
+  font-weight: 800;
+  color: var(--text-main);
+}
+
+.checklist-header p, .metrics-header p {
+  font-size: 0.785rem;
+  color: var(--text-muted);
+}
+
+.checklist-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+  gap: 1rem;
+}
+
+.checklist-card {
+  background: var(--bg-inset);
+  border: 1px solid var(--border-color);
+  border-radius: 10px;
+  padding: 0.85rem 1rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+  transition: transform 0.2s ease, box-shadow 0.2s ease;
+}
+
+.checklist-card:hover {
+  transform: translateY(-2px);
+  box-shadow: var(--card-shadow);
+}
+
+.checklist-card.pass {
+  border-left: 4px solid var(--pass-green);
+}
+
+.checklist-card.fail {
+  border-left: 4px solid var(--amber-warn);
+}
+
+.checklist-card-top {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.item-title {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  font-weight: 700;
+  font-size: 0.85rem;
+  color: var(--text-main);
+}
+
+.badge-check {
+  font-size: 0.65rem;
+  font-weight: 800;
+  padding: 0.15rem 0.45rem;
+  border-radius: 4px;
+  text-transform: uppercase;
+}
+
+.badge-check.pass {
+  background: var(--pass-green-bg);
+  color: var(--pass-green);
+  border: 1px solid var(--pass-green-border);
+}
+
+.badge-check.warn {
+  background: var(--amber-warn-bg);
+  color: var(--amber-warn);
+  border: 1px solid var(--amber-warn-border);
+}
+
+.item-desc {
+  font-size: 0.765rem;
+  color: var(--text-secondary);
+}
+
+.item-details {
+  font-size: 0.715rem;
+  color: var(--text-muted);
+  font-weight: 600;
+  background: var(--bg-subtle);
+  padding: 0.25rem 0.5rem;
+  border-radius: 6px;
+  margin-top: 0.2rem;
+}
+
+/* Detailed Metrics Table */
+.metrics-table-card {
+  overflow-x: auto;
+}
+
+.metrics-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.825rem;
+  text-align: left;
+}
+
+.metrics-table th, .metrics-table td {
+  padding: 0.65rem 0.85rem;
+  border-bottom: 1px solid var(--border-color);
+}
+
+.metrics-table th {
+  background: var(--bg-toolbar);
+  font-weight: 700;
+  color: var(--text-muted);
+  text-transform: uppercase;
+  font-size: 0.725rem;
+}
+
+.metrics-table td strong {
+  color: var(--text-main);
+}
+
+.text-green { color: var(--pass-green); font-weight: 600; }
+.text-red { color: var(--fail-red); font-weight: 600; }
+.text-amber { color: var(--amber-warn); font-weight: 600; }
+.text-muted { color: var(--text-muted); font-weight: 600; }

@@ -1,5 +1,5 @@
 import React, { useRef } from 'react';
-import { Upload, Download, Copy, Trash2, FileText, AlertCircle, AlertTriangle, Play, Bot, Loader2, Sparkles } from 'lucide-react';
+import { Upload, Download, Copy, Trash2, FileText, AlertCircle, AlertTriangle, Play, Loader2, Sparkles } from 'lucide-react';
 
 export function GherkinEditor({ code, onChange, onRunTest, onAutoFix, isFixingWithAI, errorsByLine = {}, isTested, hasIssues }) {
   const fileInputRef = useRef(null);

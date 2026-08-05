@@ -89,7 +89,7 @@ export default function App() {
     }, 150);
   };
 
-  const handleClaudeAutoFix = async () => {
+  const _handleClaudeAutoFix = async () => {
     if (!code || !code.trim()) return;
 
     setIsFixingWithAI(true);

@@ -1,5 +1,5 @@
 import React from 'react';
-import { ShieldCheck, Github, Sparkles, CheckCircle2, AlertTriangle, Play, Sun, Moon, Bot, Settings, Loader2, Code2, AlertCircle } from 'lucide-react';
+import { ShieldCheck, Github, Sparkles, CheckCircle2, AlertTriangle, Play, Sun, Moon, Settings, Loader2, Code2, AlertCircle } from 'lucide-react';
 import { SAMPLES } from '../utils/samples';
 
 export function Header({ theme, onToggleTheme, currentSampleId, onSelectSample, totalErrors, totalWarnings, overallPass, executionTimeMs, isTested, onAutoFix, onOpenAISettings, isFixingWithAI, hasIssues }) {

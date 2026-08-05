@@ -1,7 +1,105 @@
 export const SAMPLES = [
   {
+    id: 'bad_atm_withdrawal',
+    name: '❌ Anti-Pattern: ATM Cash Withdrawal (Imperative & Procedural)',
+    description: 'Demonstrates procedural button clicks, technical details, ending punctuation, and first-person "I".',
+    code: `Feature: ATM Withdrawal System
+
+  Scenario: As an enabled user, I want to withdraw cash
+    Given I authenticated with an enabled card.
+    And The teller has enough money
+    When I insert the card in the ATM
+    And I enter my PIN on the keypad
+    And I press the confirm PIN button
+    And I press the withdrawal button
+    And I enter the amount $100
+    And I press confirm
+    Then I get $100
+    And The system prints a receipt
+`
+  },
+  {
+    id: 'good_atm_withdrawal',
+    name: '✅ Refactored: ATM Cash Withdrawal (Declarative & Business-Focused)',
+    description: 'Clean declarative refactor focusing on business outcomes and domain concepts.',
+    code: `Feature: ATM Cash Withdrawal Engine
+
+  @smoke @atm
+  Scenario: Withdraw cash from ATM with sufficient balance
+    Given the customer account balance is "$1000"
+    And the ATM has "$1000" cash available
+    When the customer requests to withdraw "$100"
+    Then the ATM should dispense "$100"
+    And the customer account balance should be "$900"
+    And a transaction receipt is printed
+`
+  },
+  {
+    id: 'bad_google_search',
+    name: '❌ Anti-Pattern: Search (Multiple Behaviors in 1 Scenario)',
+    description: 'Violates One Behavior per Scenario rule with multiple When-Then sequences and UI details.',
+    code: `Feature: Search Functionality
+
+  Scenario: Search images of pandas
+    Given the user opens a web browser
+    And the user navigates to "https://www.google.com/"
+    When the user enters "panda" into the search bar
+    Then links related to "panda" are shown on the results page
+    When the user clicks on the "Images" link at the top of the results page
+    Then images related to "panda" are shown on the results page
+`
+  },
+  {
+    id: 'good_google_search',
+    name: '✅ Refactored: Search (Split into 2 Single-Behavior Scenarios)',
+    description: 'Refactored into two single-behavior scenarios, each with one Given-When-Then sequence.',
+    code: `Feature: Search Functionality
+
+  Scenario: Text search from search bar
+    Given the search engine home page is displayed
+    When the user searches for "panda"
+    Then links related to "panda" should be displayed on the results page
+
+  Scenario: Image search from search results page
+    Given search results for "panda" are displayed
+    When the user switches to the "Images" view
+    Then images related to "panda" should be displayed
+`
+  },
+  {
+    id: 'feature_template',
+    name: '📋 Official Feature Template (Background, Outlines & DataTables)',
+    description: 'Standard Gherkin template following official Cucumber syntax rules and style conventions.',
+    code: `Feature: User Authentication System
+  In order to keep user accounts secure
+  As a registered user
+  I want to log in with my credentials
+
+  Background:
+    Given the login page is displayed
+
+  @smoke @login
+  Scenario: Successful login with valid credentials
+    Given the user "alice@example.com" exists with status "active"
+    When the user submits valid login credentials
+    Then the user should be redirected to the dashboard
+    And a welcome notification should be displayed
+
+  @regression
+  Scenario Outline: Unsuccessful login attempts with invalid inputs
+    Given a registered user account
+    When the user attempts to log in with username "<username>" and password "<password>"
+    Then an error message "<error_message>" should be displayed
+
+    Examples:
+      | username          | password  | error_message            |
+      | wronguser         | test123   | Invalid username         |
+      | user@example.com  | wrongpass | Invalid password         |
+`
+  },
+  {
     id: 'valid',
-    name: '✅ Valid Feature (Passes All 4 Checkers)',
+    name: '✅ E-Commerce Shopping Cart Spec (Passes All Checkers)',
     description: 'Clean Gherkin syntax adhering to standard Cucumber rules & linter guidelines.',
     code: `Feature: E-Commerce Shopping Cart Checkout
   As a registered user of the online store
@@ -65,95 +163,6 @@ export const SAMPLES = [
         | CustomerName | InitialPoints | NewPoints | FinalTier |
         | Bob          | 4800          | 300       | Platinum  |
         | Charlie      | 2000          | 3500      | Platinum  |
-`
-  },
-  {
-    id: 'cucumber_docstrings',
-    name: '📄 Official Cucumber DataTables & DocStrings Spec',
-    description: 'Official Cucumber spec showcasing multiline DocString blocks and pipe DataTables.',
-    code: `Feature: API Webhook Notification Processing
-
-  Scenario: Receive and process JSON webhook payload
-    Given the API webhook endpoint "https://api.merchant.com/webhooks" is active
-    When a HTTP POST request is received with body:
-      """
-      {
-        "event": "payment_completed",
-        "transactionId": "TXN_987654",
-        "amount": 49.99,
-        "currency": "USD",
-        "status": "SUCCESS"
-      }
-      """
-    Then the response status code should be 200
-    And the database table "webhook_logs" should contain:
-      | Transaction ID | Event Name        | Status  |
-      | TXN_987654     | payment_completed | SUCCESS |
-`
-  },
-  {
-    id: 'syntax_error',
-    name: '❌ Syntax & Lexing Errors',
-    description: 'Triggers syntax errors in @cucumber/gherkin and sistar/gherkin-validator.',
-    code: `Feature: User Authentication System
-
-  Scenario: Login with invalid password
-    Given the user is on the login page
-    When the user enters invalid credentials
-    Then an error message should be displayed
-
-  Scenario Outline: Login with multiple user credentials
-    Given the user enters username "<user>" and password "<pass>"
-    When clicking login
-    Then the system responds with status "<status>"
-
-  # Missing Examples: keyword below for Scenario Outline above!
-  | user  | pass  | status |
-  | admin | 1234  | fail   |
-
-  Scenario: Unclosed table structure
-    Given the following items exist
-      | Item Name | Price
-      | Laptop    | 1000 |
-`
-  },
-  {
-    id: 'linter_issue',
-    name: '⚠️ Linter Rule Violations',
-    description: 'Triggers gherkin-lint rules: duplicate scenario titles, bad indentation, repeated keywords.',
-    code: `Feature: User Profile Settings
-
-Scenario: Update profile email address
-Given the user is logged into profile settings
-Given the user clicks on the email input field
-When the user types "new@example.com"
-When the user clicks save
-Then the profile should show "new@example.com"
-
-Scenario: Update profile email address
-    Given the user is on settings page
-    Then email is updated
-`
-  },
-  {
-    id: 'inconsistent_step',
-    name: '🔍 Inconsistent Steps & Missing Parameters',
-    description: 'Triggers Matriz88/gherkin-checker: dangling steps, unclosed quotes, undefined parameters.',
-    code: `Feature: Payment Processing Engine
-
-  @payment
-  Scenario: Processing credit card payment
-    And the user has entered credit card number "4111222233334444
-    Then the payment is processed successfully
-
-  Scenario Outline: Checkout with multiple currency types
-    Given the item price is "<amount>"
-    When paying in currency "<currency>"
-    Then conversion rate "<rate>" is applied
-
-    Examples:
-      | amount | currency |
-      | 100    | USD      |
 `
   }
 ];

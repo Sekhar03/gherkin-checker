@@ -1,5 +1,5 @@
 import React from 'react';
-import { Download, FileJson, FileCode } from 'lucide-react';
+import { FileJson, FileCode } from 'lucide-react';
 
 export function ReportExporter({ results, code }) {
   const exportJSON = () => {

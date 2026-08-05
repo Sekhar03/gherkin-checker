@@ -1,9 +1,10 @@
 /**
  * gherkin-lint engine implementation
+ * Extended with Gherkin Best Practices & Anti-Pattern Rules
  * https://github.com/gherkin-lint/gherkin-lint
  */
 
-export function checkGherkinLint(gherkinText, config = {}) {
+export function checkGherkinLint(gherkinText, _config = {}) {
   const result = {
     name: 'gherkin-lint',
     repo: 'https://github.com/gherkin-lint/gherkin-lint',
@@ -34,11 +35,31 @@ export function checkGherkinLint(gherkinText, config = {}) {
   let backgroundCount = 0;
   let scenarioCount = 0;
   let currentScenarioLine = null;
+  let currentScenarioRawLine = null;
   let currentScenarioTitle = null;
   let currentScenarioType = null;
   let currentScenarioHasExamples = false;
+  let currentScenarioStepCount = 0;
+  let currentScenarioWhenCount = 0;
   let lastStepKeyword = null;
   let stepOrderState = 'INIT';
+  let featureTags = new Set();
+
+  const checkEndScenarioLimits = () => {
+    if (currentScenarioLine !== null) {
+      if (currentScenarioStepCount > 10) {
+        result.warnings.push({
+          line: currentScenarioLine,
+          text: currentScenarioRawLine || '',
+          category: 'Quality Warning',
+          rule: 'scenario-step-limit',
+          reason: `Scenario "${currentScenarioTitle}" has ${currentScenarioStepCount} steps (exceeds recommended max of 10 steps per scenario).`,
+          fix: 'Shorten scenario by removing procedural setup steps or moving preconditions into Background.',
+          checker: 'gherkin-lint'
+        });
+      }
+    }
+  };
 
   for (let i = 0; i < lines.length; i++) {
     const lineNum = i + 1;
@@ -58,6 +79,43 @@ export function checkGherkinLint(gherkinText, config = {}) {
         fix: 'Remove trailing spaces or tabs at the end of this line.',
         checker: 'gherkin-lint'
       });
+    }
+
+    // Tag check (@tag)
+    if (trimmedLine.startsWith('@')) {
+      const tags = trimmedLine.split(/\s+/);
+      tags.forEach(tag => {
+        if (!tag.startsWith('@')) return;
+        
+        // Rule: tag-convention (lowercase, hyphenated)
+        if (tag !== tag.toLowerCase() || tag.includes('_')) {
+          const suggestedTag = tag.toLowerCase().replace(/_/g, '-');
+          result.warnings.push({
+            line: lineNum,
+            text: rawLine,
+            category: 'Tag Warning',
+            rule: 'tag-convention',
+            reason: `Tag "${tag}" on line ${lineNum} violates naming conventions. Tags should be lowercase and hyphenated (e.g., @smoke-test).`,
+            fix: `Rename tag "${tag}" to "${suggestedTag}".`,
+            checker: 'gherkin-lint'
+          });
+        }
+
+        if (featureCount === 1 && scenarioCount === 0) {
+          featureTags.add(tag);
+        } else if (scenarioCount > 0 && featureTags.has(tag)) {
+          result.warnings.push({
+            line: lineNum,
+            text: rawLine,
+            category: 'Tag Warning',
+            rule: 'no-dupe-feature-scenario-tags',
+            reason: `Tag "${tag}" is already applied at Feature level. Avoid repeating feature tags on individual scenarios.`,
+            fix: `Remove duplicate tag "${tag}" from scenario level.`,
+            checker: 'gherkin-lint'
+          });
+        }
+      });
+      continue;
     }
 
     if (trimmedLine.startsWith('#')) continue;
@@ -97,6 +155,7 @@ export function checkGherkinLint(gherkinText, config = {}) {
 
     // Background check
     if (trimmedLine.startsWith('Background:')) {
+      checkEndScenarioLimits();
       backgroundCount++;
       if (backgroundCount > 1) {
         result.pass = false;
@@ -126,8 +185,10 @@ export function checkGherkinLint(gherkinText, config = {}) {
       continue;
     }
 
-    // Scenario / Scenario Outline / Example check (Gherkin 6+ standard)
+    // Scenario / Scenario Outline / Example check
     if (trimmedLine.startsWith('Scenario:') || trimmedLine.startsWith('Scenario Outline:') || trimmedLine.startsWith('Scenario Template:') || trimmedLine.startsWith('Example:')) {
+      checkEndScenarioLimits();
+
       if (currentScenarioType === 'Scenario Outline' && !currentScenarioHasExamples) {
         result.pass = false;
         result.errors.push({
@@ -143,12 +204,15 @@ export function checkGherkinLint(gherkinText, config = {}) {
 
       scenarioCount++;
       currentScenarioLine = lineNum;
+      currentScenarioRawLine = rawLine;
       currentScenarioType = trimmedLine.startsWith('Scenario Outline:') || trimmedLine.startsWith('Scenario Template:') ? 'Scenario Outline' : 'Scenario';
       currentScenarioHasExamples = false;
+      currentScenarioStepCount = 0;
+      currentScenarioWhenCount = 0;
       lastStepKeyword = null;
       stepOrderState = 'INIT';
 
-      const title = trimmedLine.replace(/^(Scenario Outline:|Scenario Template:|Scenario:)\s*/, '').trim();
+      const title = trimmedLine.replace(/^(Scenario Outline:|Scenario Template:|Scenario:|Example:)\s*/, '').trim();
       currentScenarioTitle = title;
 
       if (!title) {
@@ -212,12 +276,15 @@ export function checkGherkinLint(gherkinText, config = {}) {
       continue;
     }
 
-    // Step check (Given / When / Then / And / But)
-    const stepMatch = trimmedLine.match(/^(Given|When|Then|And|But)\b\s*(.*)/);
+    // Step check (Given / When / Then / And / But / *)
+    const stepMatch = trimmedLine.match(/^(Given|When|Then|And|But|\*)\b\s*(.*)/);
     if (stepMatch) {
+      currentScenarioStepCount++;
       const keyword = stepMatch[1];
+      const stepText = stepMatch[2].trim();
       const indent = rawLine.match(/^\s*/)[0].length;
 
+      // Rule: indentation (steps should be 4 spaces)
       if (indent !== 4) {
         result.warnings.push({
           line: lineNum,
@@ -230,6 +297,59 @@ export function checkGherkinLint(gherkinText, config = {}) {
         });
       }
 
+      // Rule: no-ending-punctuation
+      if (/[.,;:]$/.test(stepText)) {
+        result.warnings.push({
+          line: lineNum,
+          text: rawLine,
+          category: 'Style Warning',
+          rule: 'no-ending-punctuation',
+          reason: `Step line ${lineNum} ends with punctuation "${stepText.slice(-1)}". Gherkin style rules specify steps should not end with punctuation.`,
+          fix: 'Remove trailing period or punctuation at the end of this step line.',
+          checker: 'gherkin-lint'
+        });
+      }
+
+      // Rule: imperative-steps-warning (imperative UI actions)
+      if (/\b(clicks?|press(es)?|types?|enters? .* into (the|a)|opens? (a |the )?(web )?browser|navigates? to "http|on the keypad|the withdrawal button)\b/i.test(stepText)) {
+        result.warnings.push({
+          line: lineNum,
+          text: rawLine,
+          category: 'Anti-Pattern Warning',
+          rule: 'imperative-steps-warning',
+          reason: `Step describes low-level procedural/imperative UI detail ("${stepText}"). Prefer high-level declarative business language (describe what, not how).`,
+          fix: 'Refactor step to express user intent (e.g. "When the user submits credentials").',
+          checker: 'gherkin-lint'
+        });
+      }
+
+      // Rule: no-first-person-perspective
+      if (/\b(I|my)\b/.test(stepText) && !/\b(API|ID|IP)\b/.test(stepText)) {
+        result.warnings.push({
+          line: lineNum,
+          text: rawLine,
+          category: 'Style Warning',
+          rule: 'no-first-person-perspective',
+          reason: `Step uses first-person phrasing ("I" / "my"). Standard Gherkin guidelines prefer role-based actor phrasing.`,
+          fix: 'Replace "I" / "my" with role/actor phrasing (e.g., "the customer", "the account balance").',
+          checker: 'gherkin-lint'
+        });
+      }
+
+      // Rule: conjunctive-step (combining multiple actions in one step)
+      if (/\b\w+\s+and\s+\w+/i.test(stepText) && /\b(see|get|enter|click|press|submit|verify|check)\b/i.test(stepText)) {
+        result.warnings.push({
+          line: lineNum,
+          text: rawLine,
+          category: 'Anti-Pattern Warning',
+          rule: 'conjunctive-step',
+          reason: `Step contains conjunctive phrase "and" joining multiple actions or verifications into one step.`,
+          fix: 'Split into two separate steps using "And" for improved modularity.',
+          checker: 'gherkin-lint'
+        });
+      }
+
+      // Rule: use-and (repeated consecutive Given/When/Then)
       if (lastStepKeyword === keyword && (keyword === 'Given' || keyword === 'When' || keyword === 'Then')) {
         result.warnings.push({
           line: lineNum,
@@ -245,6 +365,7 @@ export function checkGherkinLint(gherkinText, config = {}) {
         lastStepKeyword = keyword;
       }
 
+      // Rule: keywords-in-logical-order & one-behavior-per-scenario
       if (keyword === 'Given') {
         if (stepOrderState === 'WHEN' || stepOrderState === 'THEN') {
           result.warnings.push({
@@ -260,6 +381,18 @@ export function checkGherkinLint(gherkinText, config = {}) {
           stepOrderState = 'GIVEN';
         }
       } else if (keyword === 'When') {
+        currentScenarioWhenCount++;
+        if (currentScenarioWhenCount > 1) {
+          result.warnings.push({
+            line: lineNum,
+            text: rawLine,
+            category: 'Anti-Pattern Warning',
+            rule: 'one-behavior-per-scenario',
+            reason: `Scenario contains multiple "When" actions (Line ${lineNum}). Each Scenario must cover exactly one unit of behavior.`,
+            fix: 'Split into separate scenarios, each with one Given-When-Then sequence.',
+            checker: 'gherkin-lint'
+          });
+        }
         if (stepOrderState === 'THEN') {
           result.warnings.push({
             line: lineNum,
@@ -295,6 +428,8 @@ export function checkGherkinLint(gherkinText, config = {}) {
     }
   }
 
+  checkEndScenarioLimits();
+
   if (currentScenarioType === 'Scenario Outline' && !currentScenarioHasExamples) {
     result.pass = false;
     result.errors.push({
@@ -317,6 +452,19 @@ export function checkGherkinLint(gherkinText, config = {}) {
       rule: 'no-background-only-scenarios',
       reason: 'Feature defines a "Background:" section but contains zero Scenarios.',
       fix: 'Add at least 1 Scenario that uses the Background section.',
+      checker: 'gherkin-lint'
+    });
+  }
+
+  // Rule: feature-scenario-limit (>12 scenarios/file)
+  if (scenarioCount > 12) {
+    result.warnings.push({
+      line: 1,
+      text: featureTitle || 'Feature',
+      category: 'Quality Warning',
+      rule: 'feature-scenario-limit',
+      reason: `Feature contains ${scenarioCount} scenarios (exceeds recommended limit of ~10–12 scenarios per feature file).`,
+      fix: 'Split large feature file into smaller, focused feature files.',
       checker: 'gherkin-lint'
     });
   }

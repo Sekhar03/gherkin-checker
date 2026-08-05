@@ -70,16 +70,26 @@ function runSingleRepairPass(code, results) {
       line = line.trimEnd();
     }
 
-    // Fix unclosed quotes in step text (ignoring possessive apostrophes like merchant's, today's)
+    // Fix step line ending punctuation
     const stepMatch = trimmed.match(/^(given|when|then|and|but|\*)\b\s*(.*)/i);
     if (stepMatch) {
       let stepText = stepMatch[2];
+
+      // Fix ending punctuation on steps
+      if (/[.,;:]$/.test(stepText)) {
+        line = line.replace(/[.,;:]$/, '');
+        trimmed = line.trim();
+        stepText = stepText.slice(0, -1);
+      }
+
+      // Fix unclosed double quotes
       const dQuotes = (stepText.match(/"/g) || []).length;
       if (dQuotes % 2 !== 0) {
         line = line + '"';
         trimmed = line.trim();
       }
 
+      // Fix unclosed single quotes (ignoring possessive apostrophes like merchant's, today's)
       const codeQuotesOnly = stepText.replace(/[a-zA-Z]'[a-zA-Z]/g, '');
       const sQuotes = (codeQuotesOnly.match(/'/g) || []).length;
       if (sQuotes % 2 !== 0) {
@@ -94,13 +104,13 @@ function runSingleRepairPass(code, results) {
       trimmed = line.trim();
     }
 
-    // Fix malformed tags e.g. @ alone or @tag#invalid
+    // Fix malformed or non-standard tags (lowercase, hyphenated)
     if (trimmed.startsWith('@')) {
       const parts = trimmed.split(/\s+/);
       const cleaned = parts.map(tag => {
         if (tag === '@') return '@smoke';
         if (!tag.startsWith('@')) return tag;
-        return '@' + tag.slice(1).replace(/[^a-zA-Z0-9_\-]/g, '_');
+        return '@' + tag.slice(1).toLowerCase().replace(/[^a-z0-9-]/g, '-');
       }).join(' ');
       line = '  ' + cleaned;
     }
@@ -144,7 +154,7 @@ function runSingleRepairPass(code, results) {
  * - Generates & fixes Examples tables for Scenario Outlines
  * - Normalizes data tables & closes unclosed DocStrings at EOF
  */
-function reconstructDocumentStructure(code, activeRules = new Set()) {
+function reconstructDocumentStructure(code, _activeRules = new Set()) {
   const rawLines = code.split('\n');
 
   let mainFeatureTitle = null;
@@ -314,7 +324,13 @@ function reconstructDocumentStructure(code, activeRules = new Set()) {
 
   blocks.forEach(block => {
     if (block.type === 'tags') {
-      block.lines.forEach(t => outputLines.push(`  ${t.trim()}`));
+      block.lines.forEach(t => {
+        const formattedTag = t.split(/\s+/).map(tag => {
+          if (!tag.startsWith('@')) return tag;
+          return '@' + tag.slice(1).toLowerCase().replace(/[^a-z0-9-]/g, '-');
+        }).join(' ');
+        outputLines.push(`  ${formattedTag}`);
+      });
       return;
     }
 
@@ -332,7 +348,13 @@ function reconstructDocumentStructure(code, activeRules = new Set()) {
     if (block.type === 'scenario' || block.type === 'outline') {
       // Print scenario tags if attached
       if (block.tags && block.tags.length > 0) {
-        block.tags.forEach(t => outputLines.push(`  ${t.trim()}`));
+        block.tags.forEach(t => {
+          const formattedTag = t.split(/\s+/).map(tag => {
+            if (!tag.startsWith('@')) return tag;
+            return '@' + tag.slice(1).toLowerCase().replace(/[^a-z0-9-]/g, '-');
+          }).join(' ');
+          outputLines.push(`  ${formattedTag}`);
+        });
       }
 
       // De-duplicate Scenario Names (rule: no-dupe-scenario-names)
@@ -412,6 +434,7 @@ function reconstructDocumentStructure(code, activeRules = new Set()) {
  * - Fixes dangling conjunctions (starts with And/But -> Given)
  * - Fixes repeated keywords (Given...Given -> Given...And)
  * - Re-orders steps into logical Given -> When -> Then flow
+ * - Strips ending punctuation from steps
  * - Formats table rows & normalizes column counts
  */
 function processStepBlockLines(lines, outputArr, indent, onPlaceholderFound) {
@@ -432,6 +455,11 @@ function processStepBlockLines(lines, outputArr, indent, onPlaceholderFound) {
       let rawKw = stepMatch[1].toLowerCase();
       let kw = rawKw === '*' ? '*' : rawKw.charAt(0).toUpperCase() + rawKw.slice(1);
       let text = stepMatch[2].trim();
+
+      // Fix ending punctuation on step text
+      if (/[.,;:]$/.test(text)) {
+        text = text.slice(0, -1).trim();
+      }
 
       // Rule: dangling-conjunction (And/But without preceding Given/When/Then)
       if ((kw === 'And' || kw === 'But') && !lastMainKw) {
@@ -569,7 +597,11 @@ function formatAndStructureGherkin(code) {
       const stepMatch = trimmed.match(/^(Given|When|Then|And|But|\*)\b\s*(.*)/i);
       const rawKw = stepMatch[1];
       const kw = rawKw === '*' ? '*' : rawKw.charAt(0).toUpperCase() + rawKw.slice(1).toLowerCase();
-      formatted.push(`    ${kw} ${stepMatch[2]}`);
+      let stepText = stepMatch[2];
+      if (/[.,;:]$/.test(stepText)) {
+        stepText = stepText.slice(0, -1).trim();
+      }
+      formatted.push(`    ${kw} ${stepText}`);
     } else if (trimmed.startsWith('|')) {
       const cells = trimmed.split('|').slice(1, -1).map(c => c.trim());
       formatted.push(`      | ${cells.join(' | ')} |`);
@@ -606,26 +638,32 @@ export function fixSingleLine(code, lineNum, errorDetail) {
     return lines.join('\n');
   }
 
-  // Rule 2: Unclosed double quotes
+  // Rule 2: Ending punctuation
+  if (errorDetail?.rule === 'no-ending-punctuation' || /[.,;:]$/.test(trimmed)) {
+    lines[index] = line.replace(/[.,;:]$/, '');
+    return lines.join('\n');
+  }
+
+  // Rule 3: Unclosed double quotes
   if (errorDetail?.rule === 'unclosed-double-quote' || (trimmed.match(/"/g) || []).length % 2 !== 0) {
     lines[index] = line + '"';
     return lines.join('\n');
   }
 
-  // Rule 3: Unclosed single quotes (ignoring possessive apostrophes like merchant's)
+  // Rule 4: Unclosed single quotes (ignoring possessive apostrophes like merchant's)
   const codeQuotesOnly = trimmed.replace(/[a-zA-Z]'[a-zA-Z]/g, '');
   if (errorDetail?.rule === 'unclosed-single-quote' || (codeQuotesOnly.match(/'/g) || []).length % 2 !== 0) {
     lines[index] = line + "'";
     return lines.join('\n');
   }
 
-  // Rule 4: Table row pipe unclosed
+  // Rule 5: Table row pipe unclosed
   if (errorDetail?.rule === 'table-row-pipe-unclosed' || (trimmed.startsWith('|') && !trimmed.endsWith('|'))) {
     lines[index] = line + ' |';
     return lines.join('\n');
   }
 
-  // Rule 5: Indentation warnings
+  // Rule 6: Indentation warnings
   if (errorDetail?.rule === 'indentation' || errorDetail?.category?.includes('Indentation')) {
     if (trimmed.startsWith('Feature:')) {
       lines[index] = trimmed;
