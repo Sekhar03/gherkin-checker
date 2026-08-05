@@ -438,6 +438,11 @@ function processStepBlockLines(lines, outputArr, indent, onPlaceholderFound) {
         kw = 'Given';
       }
 
+      // Rule: keywords-in-logical-order (When after Then converted to And)
+      if (kw === 'When' && lastMainKw === 'Then') {
+        kw = 'And';
+      }
+
       // Rule: use-and (repeated consecutive Given/When/Then)
       if (kw === 'Given' || kw === 'When' || kw === 'Then') {
         if (lastMainKw === kw) {
@@ -501,32 +506,8 @@ function processStepBlockLines(lines, outputArr, indent, onPlaceholderFound) {
     }
   }
 
-  // Group & Order steps into logical flow: Given steps -> When steps -> Then steps
-  const givenSteps = [];
-  const whenSteps = [];
-  const thenSteps = [];
-  const otherSteps = [];
-
-  let currentCategory = 'GIVEN';
-
+  // Output steps in their original natural sequence to preserve scenario flow
   steps.forEach(step => {
-    if (step.keyword === 'Given') {
-      currentCategory = 'GIVEN';
-    } else if (step.keyword === 'When') {
-      currentCategory = 'WHEN';
-    } else if (step.keyword === 'Then') {
-      currentCategory = 'THEN';
-    }
-
-    if (currentCategory === 'GIVEN') givenSteps.push(step);
-    else if (currentCategory === 'WHEN') whenSteps.push(step);
-    else if (currentCategory === 'THEN') thenSteps.push(step);
-    else otherSteps.push(step);
-  });
-
-  const orderedSteps = [...givenSteps, ...whenSteps, ...thenSteps, ...otherSteps];
-
-  orderedSteps.forEach(step => {
     outputArr.push(`${indent}${step.keyword} ${step.text}`);
 
     // Format & normalize data tables
