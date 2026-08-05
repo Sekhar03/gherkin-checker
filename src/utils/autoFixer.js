@@ -2,7 +2,7 @@ import { runAllCheckers } from '../validators/masterRunner.js';
 
 /**
  * Comprehensive Internal Rule-Based Gherkin Auto-Fixer Engine
- * Reads errors & warnings from all 4 checkers and repairs both ERRORS and WARNINGS deterministically.
+ * Reads actual error & warning objects from all 4 checkers and repairs both ERRORS and WARNINGS deterministically.
  */
 
 export function autoFixGherkin(code, initialResults = null) {
@@ -39,13 +39,29 @@ export function autoFixGherkin(code, initialResults = null) {
 }
 
 /**
- * Single deterministic repair pass guided by active error & warning rules
+ * Single deterministic repair pass guided by active error & warning objects
  */
-function runSingleRepairPass(code, _results) {
+function runSingleRepairPass(code, results) {
+  if (!code) return code;
   const lines = code.split('\n');
 
-  // Pass 1: Targeted Line-Level Fixes (errors & warnings)
+  // Collect all errors & warnings grouped by 1-indexed line number
+  const lineIssuesMap = new Map();
+  if (results && results.checkers) {
+    results.checkers.forEach(c => {
+      [...(c.errors || []), ...(c.warnings || [])].forEach(issue => {
+        const lineNum = issue.line || 1;
+        if (!lineIssuesMap.has(lineNum)) {
+          lineIssuesMap.set(lineNum, []);
+        }
+        lineIssuesMap.get(lineNum).push(issue);
+      });
+    });
+  }
+
+  // Pass 1: Targeted Line-Level Fixes guided by actual issue objects
   for (let i = 0; i < lines.length; i++) {
+    const lineNum = i + 1;
     let line = lines[i];
     let trimmed = line.trim();
 
@@ -54,35 +70,46 @@ function runSingleRepairPass(code, _results) {
       continue;
     }
 
-    // Fix trailing spaces (rule: no-trailing-spaces)
+    const issuesOnLine = lineIssuesMap.get(lineNum) || [];
+
+    // Apply explicit issue-guided fixes reading the exact reason and rule
+    issuesOnLine.forEach(issue => {
+      line = fixLineByIssueDetail(line, issue);
+      trimmed = line.trim();
+    });
+
+    // Also run general fallback checks for safety
     if (/\s+$/.test(line)) {
       line = line.trimEnd();
     }
 
-    // Fix step line warnings & errors
     const stepMatch = trimmed.match(/^(given|when|then|and|but|\*)\b\s*(.*)/i);
     if (stepMatch) {
       let rawKw = stepMatch[1];
       let stepText = stepMatch[2];
 
-      // Fix ending punctuation on steps (rule: no-ending-punctuation)
+      // Fix ending punctuation on steps
       if (/[.,;:]$/.test(stepText)) {
         stepText = stepText.slice(0, -1).trim();
       }
 
-      // Fix first-person "I" / "my" (rule: no-first-person-perspective)
-      stepText = refactorFirstPerson(stepText);
+      // Fix first-person "I" / "my"
+      if (/\b(I|my)\b/.test(stepText) && !/\b(API|ID|IP)\b/.test(stepText)) {
+        stepText = refactorFirstPerson(stepText);
+      }
 
-      // Fix low-level procedural/imperative UI actions (rule: imperative-steps-warning)
-      stepText = refactorImperativeStep(stepText);
+      // Fix low-level procedural/imperative UI actions
+      if (/\b(clicks?|press(es)?|types?|enters? .* (into|in)|opens? (a |the )?(web )?browser|navigates? to|hyperlink|icon menu|vertical icon|radio button|checkbox|dropdown|keypad|modal|popup)\b/i.test(stepText)) {
+        stepText = refactorImperativeStep(stepText);
+      }
 
-      // Fix unclosed double quotes (rule: unclosed-double-quote)
+      // Fix unclosed double quotes
       const dQuotes = (stepText.match(/"/g) || []).length;
       if (dQuotes % 2 !== 0) {
         stepText = stepText + '"';
       }
 
-      // Fix unclosed single quotes (rule: unclosed-single-quote)
+      // Fix unclosed single quotes
       const codeQuotesOnly = stepText.replace(/[a-zA-Z]'[a-zA-Z]/g, '');
       const sQuotes = (codeQuotesOnly.match(/'/g) || []).length;
       if (sQuotes % 2 !== 0) {
@@ -99,7 +126,7 @@ function runSingleRepairPass(code, _results) {
       trimmed = line.trim();
     }
 
-    // Fix malformed or non-standard tags (rule: tag-convention)
+    // Fix malformed or non-standard tags
     if (trimmed.startsWith('@')) {
       const parts = trimmed.split(/\s+/);
       const cleaned = parts.map(tag => {
@@ -558,6 +585,77 @@ function processStepBlockLines(lines, outputArr, indent, onPlaceholderFound) {
 }
 
 /**
+ * Targeted Line Fixer guided by actual issue rule, reason, and category!
+ */
+function fixLineByIssueDetail(line, issue) {
+  if (!line || !issue) return line;
+  let trimmed = line.trim();
+  const rule = issue.rule || '';
+  const reason = issue.reason || '';
+
+  // 1. Imperative steps warning
+  if (rule === 'imperative-steps-warning' || reason.includes('procedural/imperative UI detail')) {
+    const stepMatch = trimmed.match(/^(given|when|then|and|but|\*)\b\s*(.*)/i);
+    if (stepMatch) {
+      const kw = stepMatch[1];
+      const fixedText = refactorImperativeStep(stepMatch[2]);
+      return `    ${kw} ${fixedText}`;
+    }
+  }
+
+  // 2. First-person perspective warning
+  if (rule === 'no-first-person-perspective' || reason.includes('first-person phrasing')) {
+    const stepMatch = trimmed.match(/^(given|when|then|and|but|\*)\b\s*(.*)/i);
+    if (stepMatch) {
+      const kw = stepMatch[1];
+      const fixedText = refactorFirstPerson(stepMatch[2]);
+      return `    ${kw} ${fixedText}`;
+    }
+  }
+
+  // 3. Ending punctuation warning
+  if (rule === 'no-ending-punctuation' || reason.includes('ends with punctuation')) {
+    return line.replace(/[.,;:]\s*$/, '').trimEnd();
+  }
+
+  // 4. Consecutive keyword repeat (use-and)
+  if (rule === 'use-and' || reason.includes('Consecutive step repeats keyword')) {
+    return line.replace(/^(Given|When|Then)\b/i, 'And');
+  }
+
+  // 5. Logical order / one-behavior-per-scenario
+  if (rule === 'keywords-in-logical-order' || rule === 'one-behavior-per-scenario' || reason.includes('multiple "When" actions')) {
+    if (/^\s*When\b/i.test(line)) {
+      return line.replace(/^\s*When\b/i, '    And');
+    }
+  }
+
+  // 6. Tag naming convention
+  if (rule === 'tag-convention' || reason.includes('tag') || trimmed.startsWith('@')) {
+    const parts = trimmed.split(/\s+/);
+    const cleaned = parts.map(tag => {
+      if (!tag.startsWith('@')) return tag;
+      return '@' + tag.slice(1).toLowerCase().replace(/[^a-z0-9-]/g, '-');
+    }).join(' ');
+    return '  ' + cleaned;
+  }
+
+  // 7. Trailing spaces
+  if (rule === 'no-trailing-spaces') {
+    return line.trimEnd();
+  }
+
+  // 8. Quotes
+  if (rule === 'unclosed-double-quote') return line + '"';
+  if (rule === 'unclosed-single-quote') return line + "'";
+
+  // 9. Table pipe closure
+  if (rule === 'table-row-pipe-unclosed') return line + ' |';
+
+  return line;
+}
+
+/**
  * Refactor First-Person "I" / "my" to third-person role phrasing
  */
 function refactorFirstPerson(text) {
@@ -590,19 +688,25 @@ function refactorImperativeStep(text) {
     return `the user selects "${targetName}"`;
   });
 
-  // 2. Unquoted element click e.g. "click the three-dot vertical icon menu on the ticket"
+  // 2. Unquoted element click with quotes e.g. "click hyperlink 'View All'"
+  refactored = refactored.replace(/(the user |user )?clicks? (on |upon )?(the )?(hyperlink|link|button|tab|menu item|option|toggle|checkbox|radio button|icon) ("([^"]+)"|'([^']+)').*/gi, (match, p1, p2, p3, elementKind, qFull, qName1, qName2) => {
+    const targetName = (qName1 || qName2 || 'option').trim();
+    return `the user selects "${targetName}"`;
+  });
+
+  // 3. Unquoted descriptive element click e.g. "click the three-dot vertical icon menu on the ticket"
   refactored = refactored.replace(/(the user |user )?clicks? (on |upon )?(the )?([a-zA-Z0-9_\s-]+) (hyperlink|link|button|icon menu|vertical icon|icon|menu|dropdown|tab|toggle)(\s+on the [a-zA-Z0-9_\s-]+ page|\s+on the [a-zA-Z0-9_\s-]+)?/gi, (match, p1, p2, p3, targetName) => {
     return `the user selects the ${targetName.trim()} view`;
   });
 
-  // 3. Unquoted generic click e.g. "click the View All hyperlink"
+  // 4. Simple unquoted click e.g. "click the View All hyperlink"
   refactored = refactored.replace(/(the user |user )?clicks? (on |upon )?(the )?([a-zA-Z0-9_\s-]+)/gi, (match, p1, p2, p3, targetName) => {
     let cleaned = targetName.replace(/\b(hyperlink|link|button|icon menu|vertical icon|icon|menu|dropdown|on the landing page|on the ticket|on the page)\b/gi, '').trim();
-    if (!cleaned) cleaned = 'option';
+    if (!cleaned || cleaned === 'the user' || cleaned === 'user') cleaned = 'option';
     return `the user selects "${cleaned}"`;
   });
 
-  // 4. Input / Type / Enter text patterns: "enters 'test' into the email input field"
+  // 5. Input / Type / Enter text patterns: "enters 'test' into the email input field"
   refactored = refactored.replace(/(the user |user )?(types?|enters?|fills? in) "([^"]+)" into (the |a )?([a-zA-Z0-9_\s-]+) (field|input|textbox|search bar|box)/gi, (match, p1, p2, val, p4, fieldName) => {
     return `the user provides "${val}" for ${fieldName.trim()}`;
   });
@@ -610,12 +714,12 @@ function refactorImperativeStep(text) {
     return `the user provides "${val}" for ${fieldName.trim()}`;
   });
 
-  // 5. Browser navigation & URL patterns
+  // 6. Browser navigation & URL patterns
   refactored = refactored.replace(/(the user |user )?opens? (a |the )?(web )?browser/gi, 'the application is launched');
   refactored = refactored.replace(/(the user |user )?navigates? to "https?:\/\/[^"]+"/gi, 'the main landing page is displayed');
   refactored = refactored.replace(/(the user |user )?navigates? to (the )?([a-zA-Z0-9_\s-]+) page/gi, 'the $3 page is displayed');
 
-  // 6. Keypad / button press residual patterns
+  // 7. Keypad / button press residual patterns
   refactored = refactored.replace(/presses? (the )?confirm PIN button/gi, 'confirms the PIN');
   refactored = refactored.replace(/presses? (the )?withdrawal button/gi, 'selects withdrawal');
   refactored = refactored.replace(/presses? confirm/gi, 'submits the request');
@@ -693,91 +797,11 @@ export function fixSingleLine(code, lineNum, errorDetail) {
   if (index < 0 || index >= lines.length) return autoFixGherkin(code);
 
   let line = lines[index];
-  let trimmed = line.trim();
 
-  // Rule 1: No trailing spaces
-  if (errorDetail?.rule === 'no-trailing-spaces' || /\s+$/.test(line)) {
-    lines[index] = line.trimEnd();
-    return lines.join('\n');
-  }
-
-  // Rule 2: Ending punctuation
-  if (errorDetail?.rule === 'no-ending-punctuation' || /[.,;:]$/.test(trimmed)) {
-    lines[index] = line.replace(/[.,;:]$/, '');
-    return lines.join('\n');
-  }
-
-  // Rule 3: First-person "I" / "my"
-  if (errorDetail?.rule === 'no-first-person-perspective' || /\b(I|my)\b/.test(trimmed)) {
-    const stepMatch = trimmed.match(/^(given|when|then|and|but|\*)\b\s*(.*)/i);
-    if (stepMatch) {
-      const kw = stepMatch[1];
-      const fixedText = refactorFirstPerson(stepMatch[2]);
-      lines[index] = `    ${kw} ${fixedText}`;
-      return lines.join('\n');
-    }
-  }
-
-  // Rule 4: Imperative steps warning
-  if (errorDetail?.rule === 'imperative-steps-warning') {
-    const stepMatch = trimmed.match(/^(given|when|then|and|but|\*)\b\s*(.*)/i);
-    if (stepMatch) {
-      const kw = stepMatch[1];
-      const fixedText = refactorImperativeStep(stepMatch[2]);
-      lines[index] = `    ${kw} ${fixedText}`;
-      return lines.join('\n');
-    }
-  }
-
-  // Rule 5: Tag convention
-  if (errorDetail?.rule === 'tag-convention' || trimmed.startsWith('@')) {
-    const parts = trimmed.split(/\s+/);
-    const cleaned = parts.map(tag => {
-      if (!tag.startsWith('@')) return tag;
-      return '@' + tag.slice(1).toLowerCase().replace(/[^a-z0-9-]/g, '-');
-    }).join(' ');
-    lines[index] = '  ' + cleaned;
-    return lines.join('\n');
-  }
-
-  // Rule 6: Consecutive keyword repeat (use-and)
-  if (errorDetail?.rule === 'use-and') {
-    lines[index] = line.replace(/^(Given|When|Then)\b/i, 'And');
-    return lines.join('\n');
-  }
-
-  // Rule 7: Unclosed double quotes
-  if (errorDetail?.rule === 'unclosed-double-quote' || (trimmed.match(/"/g) || []).length % 2 !== 0) {
-    lines[index] = line + '"';
-    return lines.join('\n');
-  }
-
-  // Rule 8: Unclosed single quotes
-  const codeQuotesOnly = trimmed.replace(/[a-zA-Z]'[a-zA-Z]/g, '');
-  if (errorDetail?.rule === 'unclosed-single-quote' || (codeQuotesOnly.match(/'/g) || []).length % 2 !== 0) {
-    lines[index] = line + "'";
-    return lines.join('\n');
-  }
-
-  // Rule 9: Table row pipe unclosed
-  if (errorDetail?.rule === 'table-row-pipe-unclosed' || (trimmed.startsWith('|') && !trimmed.endsWith('|'))) {
-    lines[index] = line + ' |';
-    return lines.join('\n');
-  }
-
-  // Rule 10: Indentation warnings
-  if (errorDetail?.rule === 'indentation' || errorDetail?.category?.includes('Indentation')) {
-    if (trimmed.startsWith('Feature:')) {
-      lines[index] = trimmed;
-    } else if (trimmed.startsWith('Scenario:') || trimmed.startsWith('Scenario Outline:') || trimmed.startsWith('Background:') || trimmed.startsWith('Example:')) {
-      lines[index] = '  ' + trimmed;
-    } else if (/^(Given|When|Then|And|But|\*)\b/i.test(trimmed)) {
-      lines[index] = '    ' + trimmed;
-    } else if (trimmed.startsWith('Examples:')) {
-      lines[index] = '    ' + trimmed;
-    } else if (trimmed.startsWith('|')) {
-      lines[index] = '      ' + trimmed;
-    }
+  // Explicitly call fixLineByIssueDetail to read exact reason and rule!
+  if (errorDetail) {
+    line = fixLineByIssueDetail(line, errorDetail);
+    lines[index] = line;
     return lines.join('\n');
   }
 
