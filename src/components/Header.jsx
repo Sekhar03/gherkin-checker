@@ -83,10 +83,10 @@ export function Header({ theme, onToggleTheme, currentSampleId, onSelectSample, 
                 onClick={onAutoFix}
                 disabled={isFixingWithAI}
                 className="btn-autofix-header btn-claude-ai"
-                title="Use Claude AI to analyze all checker errors and automatically repair code"
+                title="Deterministically repair all errors & warnings across all 4 checkers using internal rule engine (No AI required)"
               >
-                {isFixingWithAI ? <Loader2 size={14} className="spin-icon" /> : <Bot size={15} />}
-                <span>{isFixingWithAI ? 'Fixing...' : 'Fix with AI'}</span>
+                {isFixingWithAI ? <Loader2 size={14} className="spin-icon" /> : <Sparkles size={15} />}
+                <span>{isFixingWithAI ? 'Fixing...' : 'Auto-Fix (No AI)'}</span>
               </button>
             )}
 

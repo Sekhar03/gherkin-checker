@@ -51,6 +51,22 @@ export default function App() {
     setIsTested(true);
   };
 
+  const handleInternalAutoFix = () => {
+    if (!code || !code.trim()) return;
+
+    setIsFixingWithAI(true);
+    setTimeout(() => {
+      const fixedCode = autoFixGherkin(code, analysisResults);
+      setCode(fixedCode);
+      const newResults = runAllCheckers(fixedCode);
+      setAnalysisResults(newResults);
+      setIsTested(true);
+      setIsFixingWithAI(false);
+      setFixNotice('⚡ Internal Rule-Based Auto-Fix applied! Repaired syntax, structure, quotes & indentation without AI.');
+      setTimeout(() => setFixNotice(null), 5000);
+    }, 150);
+  };
+
   const handleClaudeAutoFix = async () => {
     if (!code || !code.trim()) return;
 
@@ -65,7 +81,6 @@ export default function App() {
 
       const fixedCode = typeof res === 'string' ? res : res.fixedCode;
       const usedApi = typeof res === 'object' ? res.usedApi : false;
-      const apiError = typeof res === 'object' ? res.apiError : null;
 
       setCode(fixedCode);
       handleRunTest(fixedCode);
@@ -73,24 +88,19 @@ export default function App() {
       if (usedApi) {
         setFixNotice('🤖 Connected via Claude AI API! Repaired all 4 checker errors.');
       } else {
-        setFixNotice('✨ Auto-Fix applied! Repaired syntax, keywords, and indentations.');
+        setFixNotice('⚡ Internal Rule-Based Auto-Fix applied! Repaired syntax, keywords, and indentations.');
       }
     } catch (err) {
       console.error('Claude AI Fix Error:', err);
       // Run smart fallback fix
-      const fallbackFixed = autoFixGherkin(code);
+      const fallbackFixed = autoFixGherkin(code, analysisResults);
       setCode(fallbackFixed);
       handleRunTest(fallbackFixed);
-      setFixNotice('✨ Applied Smart Auto-Fix! Repaired syntax, keywords, and indentations.');
+      setFixNotice('⚡ Applied Internal Rule-Based Auto-Fix! Repaired syntax, keywords, and indentations.');
     } finally {
       setIsFixingWithAI(false);
       setTimeout(() => setFixNotice(null), 5000);
     }
-  };
-
-
-  const handleAutoFix = () => {
-    handleClaudeAutoFix();
   };
 
   const handleFixSingleLine = (lineNum, errorDetail) => {
@@ -136,7 +146,7 @@ export default function App() {
         overallPass={analysisResults?.overallPass || false}
         executionTimeMs={analysisResults?.executionTimeMs || '0.00'}
         isTested={isTested}
-        onAutoFix={handleClaudeAutoFix}
+        onAutoFix={handleInternalAutoFix}
         onOpenAISettings={() => setIsAISettingsOpen(true)}
         isFixingWithAI={isFixingWithAI}
         hasIssues={(analysisResults?.totalErrors || 0) > 0 || (analysisResults?.totalWarnings || 0) > 0}
@@ -148,7 +158,7 @@ export default function App() {
           code={code}
           onChange={handleCodeChange}
           onRunTest={() => handleRunTest(code)}
-          onAutoFix={handleClaudeAutoFix}
+          onAutoFix={handleInternalAutoFix}
           isFixingWithAI={isFixingWithAI}
           errorsByLine={analysisResults?.errorsByLine || {}}
           isTested={isTested}
@@ -159,7 +169,7 @@ export default function App() {
           results={analysisResults}
           isTested={isTested}
           onRunTest={() => handleRunTest(code)}
-          onAutoFix={handleClaudeAutoFix}
+          onAutoFix={handleInternalAutoFix}
           onFixLine={handleFixSingleLine}
           isFixingWithAI={isFixingWithAI}
         />

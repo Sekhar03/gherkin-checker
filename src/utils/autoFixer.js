@@ -1,10 +1,12 @@
+import { runAllCheckers } from '../validators/masterRunner.js';
+
 /**
- * Comprehensive Gherkin Auto-Fixer Engine
- * Automatically repairs all syntax errors, linter violations, step inconsistencies,
- * missing Examples tables/columns, unclosed quotes, and indentation for all 4 checkers.
+ * Comprehensive Internal Rule-Based Gherkin Auto-Fixer Engine
+ * Reads errors and warnings from all 4 checkers (@cucumber/gherkin AST, gherkin-lint rules,
+ * Matriz88 consistency, and sistar lexer) and repairs them deterministically without using AI.
  */
 
-export function autoFixGherkin(code) {
+export function autoFixGherkin(code, initialResults = null) {
   if (!code || !code.trim()) {
     return `Feature: User Feature Specification
 
@@ -14,435 +16,589 @@ export function autoFixGherkin(code) {
     Then the system should process the request successfully`;
   }
 
-  // Pre-pass: Handle multiple Feature definitions & multiple Background sections
-  let featureCount = 0;
-  let backgroundCount = 0;
-  let activeRuleBackgroundSteps = [];
+  let currentCode = code;
 
-  const preProcessedLines = [];
-  const rawInputLines = code.split('\n');
+  // Run up to 3 repair passes until all errors & warnings are cleared
+  for (let pass = 1; pass <= 3; pass++) {
+    const results = (pass === 1 && initialResults) ? initialResults : runAllCheckers(currentCode);
 
-  for (let i = 0; i < rawInputLines.length; i++) {
-    let line = rawInputLines[i];
+    // If completely clean (no errors & no warnings), stop early!
+    if (results.totalErrors === 0 && results.totalWarnings === 0) {
+      break;
+    }
+
+    const nextCode = runSingleRepairPass(currentCode, results);
+    if (nextCode === currentCode) {
+      // Reached steady state
+      break;
+    }
+    currentCode = nextCode;
+  }
+
+  // Final structural & indentation pass to ensure perfect formatting
+  return formatAndStructureGherkin(currentCode);
+}
+
+/**
+ * Single deterministic repair pass guided by actual error & warning objects
+ */
+function runSingleRepairPass(code, results) {
+  const lines = code.split('\n');
+
+  // Collect error & warning rules per line
+  const lineIssues = {};
+  const activeRules = new Set();
+
+  if (results && results.checkers) {
+    results.checkers.forEach(c => {
+      [...(c.errors || []), ...(c.warnings || [])].forEach(issue => {
+        if (issue.rule) activeRules.add(issue.rule);
+        if (issue.line) {
+          if (!lineIssues[issue.line]) lineIssues[issue.line] = [];
+          lineIssues[issue.line].push(issue);
+        }
+      });
+    });
+  }
+
+  // Pass 1: Targeted Line-Level Fixes
+  for (let i = 0; i < lines.length; i++) {
+    const lineNum = i + 1;
+    let line = lines[i];
     let trimmed = line.trim();
 
-    // Fix trailing unmatched single quote e.g. balance' -> balance
-    if (trimmed.endsWith("'") && (trimmed.match(/'/g) || []).length % 2 !== 0) {
-      line = line.slice(0, line.lastIndexOf("'"));
-      trimmed = line.trim();
-    }
-
-    // Convert 2nd+ Feature: to Rule: (Gherkin 6+ standard for multi-domain feature files)
-    if (/^feature\b/i.test(trimmed) || trimmed.startsWith('Feature:') || trimmed.startsWith('Feature')) {
-      featureCount++;
-      if (featureCount > 1) {
-        let title = trimmed.replace(/^feature\s*:?\s*/i, '').trim() || 'Additional Feature Rules';
-        preProcessedLines.push(`Rule: ${title}`);
-        activeRuleBackgroundSteps = [];
-        continue;
-      }
-    }
-
-    // Handle secondary Background: blocks under Rules
-    if (/^background\b/i.test(trimmed) || trimmed.startsWith('Background:') || trimmed.startsWith('Background')) {
-      backgroundCount++;
-      if (backgroundCount > 1) {
-        activeRuleBackgroundSteps = [];
-        i++;
-        while (i < rawInputLines.length) {
-          let bgLine = rawInputLines[i];
-          let bgTrimmed = bgLine.trim();
-          if (/^(scenario|scenario outline|rule|feature)\b/i.test(bgTrimmed) || bgTrimmed.startsWith('Scenario:') || bgTrimmed.startsWith('Rule:') || bgTrimmed.startsWith('Feature:')) {
-            i--;
-            break;
-          }
-          if (bgTrimmed && !bgTrimmed.startsWith('#')) {
-            activeRuleBackgroundSteps.push(bgTrimmed);
-          }
-          i++;
-        }
-        continue;
-      }
-    }
-
-    // Inject active Rule Background steps before first step of Scenario
-    if (activeRuleBackgroundSteps.length > 0 && (/^(scenario|scenario outline)\b/i.test(trimmed) || trimmed.startsWith('Scenario:') || trimmed.startsWith('Scenario Outline:'))) {
-      preProcessedLines.push(line);
-      activeRuleBackgroundSteps.forEach(step => {
-        preProcessedLines.push('    ' + step);
-      });
+    if (!trimmed) {
+      lines[i] = '';
       continue;
     }
 
-    preProcessedLines.push(line);
+    // Fix trailing spaces
+    if (/\s+$/.test(line)) {
+      line = line.trimEnd();
+    }
+
+    // Fix unclosed double quote in step text
+    const stepMatch = trimmed.match(/^(given|when|then|and|but)\b\s*(.*)/i);
+    if (stepMatch) {
+      let stepText = stepMatch[2];
+      const dQuotes = (stepText.match(/"/g) || []).length;
+      if (dQuotes % 2 !== 0) {
+        line = line + '"';
+        trimmed = line.trim();
+      }
+
+      const sQuotes = (stepText.match(/'/g) || []).length;
+      if (sQuotes % 2 !== 0) {
+        line = line + "'";
+        trimmed = line.trim();
+      }
+    }
+
+    // Fix unclosed pipe tables
+    if (trimmed.startsWith('|') && !trimmed.endsWith('|')) {
+      line = line + ' |';
+      trimmed = line.trim();
+    }
+
+    // Fix malformed tags e.g. @ alone or @tag#invalid
+    if (trimmed.startsWith('@')) {
+      const parts = trimmed.split(/\s+/);
+      const cleaned = parts.map(tag => {
+        if (tag === '@') return '@smoke';
+        if (!tag.startsWith('@')) return tag;
+        return '@' + tag.slice(1).replace(/[^a-zA-Z0-9_\-]/g, '_');
+      }).join(' ');
+      line = '  ' + cleaned;
+    }
+
+    // Fix unnamed Feature header
+    if (/^feature\s*:?/i.test(trimmed)) {
+      let title = trimmed.replace(/^feature\s*:?\s*/i, '').trim();
+      if (!title) {
+        title = 'User Feature Specification';
+      }
+      line = `Feature: ${title}`;
+    }
+
+    // Fix missing colon on Feature / Scenario / Background / Examples / Rules
+    if (/^feature\b(?!:)/i.test(trimmed)) {
+      line = line.replace(/^feature\b\s*/i, 'Feature: ');
+    } else if (/^scenario\s+outline\b(?!:)/i.test(trimmed)) {
+      line = line.replace(/^scenario\s+outline\b\s*/i, 'Scenario Outline: ');
+    } else if (/^scenario\b(?!:)/i.test(trimmed)) {
+      line = line.replace(/^scenario\b\s*/i, 'Scenario: ');
+    } else if (/^background\b(?!:)/i.test(trimmed)) {
+      line = line.replace(/^background\b\s*/i, 'Background: ');
+    } else if (/^examples\b(?!:)/i.test(trimmed)) {
+      line = line.replace(/^examples\b\s*/i, 'Examples: ');
+    } else if (/^rule\b(?!:)/i.test(trimmed)) {
+      line = line.replace(/^rule\b\s*/i, 'Rule: ');
+    }
+
+    lines[i] = line;
   }
 
-  let rawLines = preProcessedLines.map(l => l.trimEnd());
+  let processedCode = lines.join('\n');
 
-  // Step 1: Pre-process block structure (Feature, Scenarios, Backgrounds, Outlines, Examples, Rules)
+  // Pass 2: Document Structure Reconstruction
+  return reconstructDocumentStructure(processedCode, activeRules);
+}
+
+/**
+ * Reconstructs Gherkin Document Structure:
+ * - Guarantees Feature at root
+ * - Resolves duplicate background blocks
+ * - De-duplicates scenario names
+ * - Fixes dangling conjunctions (And/But before Given)
+ * - Converts repeated Given/When/Then to And
+ * - Re-orders out-of-sequence steps (Given -> When -> Then)
+ * - Generates & fixes Examples tables for Scenario Outlines
+ * - Normalizes data tables & closes DocStrings
+ */
+function reconstructDocumentStructure(code, activeRules = new Set()) {
+  const rawLines = code.split('\n');
+
   let hasFeature = false;
-  const blocks = [];
+  let featureTitle = 'User Feature Specification';
+  let featureDescriptionLines = [];
+  let backgroundBlock = null;
+  let blocks = [];
   let currentBlock = null;
+  let inDocString = false;
+  let docStringDelimiter = '"""';
 
+  // 1. Tokenize lines into structured Gherkin blocks
   for (let i = 0; i < rawLines.length; i++) {
     let line = rawLines[i];
     let trimmed = line.trim();
 
-    if (!trimmed || trimmed.startsWith('#')) {
-      if (currentBlock) {
-        currentBlock.lines.push(line);
+    if (trimmed.startsWith('"""') || trimmed.startsWith("'''")) {
+      if (inDocString) {
+        inDocString = false;
+        if (currentBlock) currentBlock.lines.push(docStringDelimiter);
+        continue;
       } else {
-        blocks.push({ type: 'header', lines: [line] });
+        inDocString = true;
+        docStringDelimiter = trimmed.slice(0, 3);
+        if (currentBlock) currentBlock.lines.push(docStringDelimiter);
+        continue;
       }
+    }
+
+    if (inDocString) {
+      if (currentBlock) currentBlock.lines.push(line);
       continue;
     }
 
-    if (/^feature\b/i.test(trimmed) || trimmed.startsWith('Feature:') || trimmed.startsWith('Feature')) {
+    if (!trimmed) continue;
+
+    if (trimmed.startsWith('Feature:')) {
       hasFeature = true;
-      let title = trimmed.replace(/^feature\s*:?\s*/i, '').trim() || 'User Feature Specification';
-      currentBlock = { type: 'feature', title, lines: [] };
-      blocks.push(currentBlock);
+      featureTitle = trimmed.replace(/^Feature:\s*/, '').trim() || 'User Feature Specification';
       continue;
     }
 
-    if (/^rule\b/i.test(trimmed) || trimmed.startsWith('Rule:')) {
-      let title = trimmed.replace(/^rule\s*:?\s*/i, '').trim() || 'Business Rule';
+    if (trimmed.startsWith('Background:')) {
+      let title = trimmed.replace(/^Background:\s*/, '').trim();
+      if (!backgroundBlock) {
+        backgroundBlock = { type: 'background', title, lines: [] };
+      }
+      currentBlock = backgroundBlock;
+      continue;
+    }
+
+    if (trimmed.startsWith('Rule:')) {
+      let title = trimmed.replace(/^Rule:\s*/, '').trim() || 'Business Rule';
       currentBlock = { type: 'rule', title, lines: [] };
       blocks.push(currentBlock);
       continue;
     }
 
-    if (trimmed.startsWith('@')) {
-      if (currentBlock) {
-        currentBlock.lines.push(line);
+    if (trimmed.startsWith('Scenario:') || trimmed.startsWith('Scenario Outline:') || trimmed.startsWith('Scenario Template:')) {
+      let isOutline = trimmed.startsWith('Scenario Outline:') || trimmed.startsWith('Scenario Template:');
+      let title = trimmed.replace(/^(Scenario Outline:|Scenario Template:|Scenario:)\s*/, '').trim();
+      currentBlock = { type: isOutline ? 'outline' : 'scenario', title, lines: [], examples: null };
+      blocks.push(currentBlock);
+      continue;
+    }
+
+    if (trimmed.startsWith('Examples:') || trimmed.startsWith('Scenarios:')) {
+      let title = trimmed.replace(/^(Examples:|Scenarios:)\s*/, '').trim();
+      let examplesObj = { type: 'examples', title, header: [], rows: [] };
+      if (currentBlock && (currentBlock.type === 'outline' || currentBlock.type === 'scenario')) {
+        currentBlock.type = 'outline'; // Ensure block is outline if it has Examples
+        currentBlock.examples = examplesObj;
       } else {
-        currentBlock = { type: 'tags', lines: [line] };
+        // Standalone Examples block -> convert to new Scenario Outline
+        currentBlock = { type: 'outline', title: 'Data Driven Flow', lines: [], examples: examplesObj };
         blocks.push(currentBlock);
       }
       continue;
     }
 
-    if (/^background\b/i.test(trimmed) || trimmed.startsWith('Background:') || trimmed.startsWith('Background')) {
-      let title = trimmed.replace(/^background\s*:?\s*/i, '').trim();
-      currentBlock = { type: 'background', title, lines: [] };
-      blocks.push(currentBlock);
+    if (trimmed.startsWith('@')) {
+      if (!currentBlock || currentBlock.type === 'background') {
+        currentBlock = { type: 'tags', lines: [trimmed] };
+        blocks.push(currentBlock);
+      } else {
+        if (!currentBlock.tags) currentBlock.tags = [];
+        currentBlock.tags.push(trimmed);
+      }
       continue;
     }
 
-    if (
-      /^scenario\s+outline\b/i.test(trimmed) ||
-      /^scenario\s+template\b/i.test(trimmed) ||
-      /^scenario\b/i.test(trimmed) ||
-      trimmed.startsWith('Scenario:') ||
-      trimmed.startsWith('Scenario Outline:') ||
-      trimmed.startsWith('Scenario Template:')
-    ) {
-      let isOutline = /^scenario\s+(outline|template)\b/i.test(trimmed) || trimmed.startsWith('Scenario Outline:') || trimmed.startsWith('Scenario Template:');
-      let title = trimmed.replace(/^scenario\s*(outline|template)?\s*:?\s*/i, '').trim();
-      currentBlock = { type: isOutline ? 'outline' : 'scenario', title, lines: [] };
-      blocks.push(currentBlock);
-      continue;
-    }
-
-    if (/^examples\s*:?/i.test(trimmed) || trimmed.startsWith('Examples:')) {
-      let title = trimmed.replace(/^examples\s*:?\s*/i, '').trim();
-      currentBlock = { type: 'examples', title, lines: [] };
-      blocks.push(currentBlock);
+    if (trimmed.startsWith('#')) {
+      if (currentBlock) {
+        currentBlock.lines.push(line);
+      }
       continue;
     }
 
     if (currentBlock) {
-      currentBlock.lines.push(line);
-    } else {
-      currentBlock = { type: 'generic', lines: [line] };
-      blocks.push(currentBlock);
-    }
-  }
+      if (currentBlock.examples && trimmed.startsWith('|')) {
+        let tableRow = trimmed;
+        if (!tableRow.startsWith('|')) tableRow = '| ' + tableRow;
+        if (!tableRow.endsWith('|')) tableRow = tableRow + ' |';
+        const cells = tableRow.split('|').slice(1, -1).map(c => c.trim());
 
-  // Step 2: Reconstruct clean Gherkin document with strict rule compliance
-  const outputLines = [];
-  if (!hasFeature) {
-    outputLines.push('Feature: User Feature Specification', '');
-  }
-
-  const scenarioTitlesSeen = new Map();
-  let inOutline = false;
-  let outlinePlaceholders = new Set();
-  let outlineHasExamples = false;
-  let outlineExamplesHeader = [];
-  let outlineExamplesRows = [];
-  let lastKeyword = null;
-
-  function flushOutlineExamples() {
-    if (!inOutline) return;
-    if (!outlineHasExamples) {
-      outputLines.push('    Examples:');
-      const phList = Array.from(outlinePlaceholders);
-      if (phList.length > 0) {
-        outputLines.push(`      | ${phList.join(' | ')} |`);
-        outputLines.push(`      | ${phList.map(p => `${p}_val`).join(' | ')} |`);
-      } else {
-        outputLines.push('      | param1 | param2 |');
-        outputLines.push('      | value1 | value2 |');
-      }
-      outputLines.push('');
-    } else if (outlineExamplesHeader.length > 0) {
-      const phList = Array.from(outlinePlaceholders);
-      let updatedHeader = [...outlineExamplesHeader];
-
-      phList.forEach(ph => {
-        if (!updatedHeader.includes(ph)) {
-          updatedHeader.push(ph);
+        if (currentBlock.examples.header.length === 0) {
+          currentBlock.examples.header = cells;
+        } else {
+          currentBlock.examples.rows.push(cells);
         }
-      });
-
-      outputLines.push('    Examples:');
-      outputLines.push(`      | ${updatedHeader.join(' | ')} |`);
-
-      if (outlineExamplesRows.length > 0) {
-        outlineExamplesRows.forEach(row => {
-          let updatedRow = [...row];
-          while (updatedRow.length < updatedHeader.length) {
-            const addedColIndex = updatedRow.length;
-            const colName = updatedHeader[addedColIndex] || 'val';
-            updatedRow.push(`${colName}_1`);
-          }
-          outputLines.push(`      | ${updatedRow.join(' | ')} |`);
-        });
       } else {
-        outputLines.push(`      | ${updatedHeader.map(h => `${h}_val`).join(' | ')} |`);
+        currentBlock.lines.push(line);
       }
-      outputLines.push('');
+    } else {
+      // Header comments or Feature description
+      featureDescriptionLines.push(line);
     }
-    inOutline = false;
-    outlineHasExamples = false;
-    outlinePlaceholders.clear();
-    outlineExamplesHeader = [];
-    outlineExamplesRows = [];
   }
 
-  for (let b = 0; b < blocks.length; b++) {
-    const block = blocks[b];
+  // Close unclosed DocString if file ended abruptly
+  if (inDocString && currentBlock) {
+    currentBlock.lines.push(docStringDelimiter);
+  }
 
-    if (block.type === 'feature') {
-      flushOutlineExamples();
-      outputLines.push(`Feature: ${block.title}`);
-      lastKeyword = null;
-      continue;
+  // 2. Output Re-construction
+  const outputLines = [];
+
+  // Feature Header
+  outputLines.push(`Feature: ${featureTitle}`);
+  featureDescriptionLines.forEach(l => {
+    if (l.trim()) outputLines.push(`  ${l.trim()}`);
+  });
+  outputLines.push('');
+
+  // Primary Background Block
+  if (backgroundBlock) {
+    outputLines.push(`  Background:${backgroundBlock.title ? ' ' + backgroundBlock.title : ''}`);
+    processStepBlockLines(backgroundBlock.lines, outputLines, '    ');
+    outputLines.push('');
+  }
+
+  // Scenarios & Rules Processing
+  const scenarioNamesSeen = new Map();
+
+  blocks.forEach(block => {
+    if (block.type === 'tags') {
+      block.lines.forEach(t => outputLines.push(`  ${t.trim()}`));
+      return;
     }
 
     if (block.type === 'rule') {
-      flushOutlineExamples();
-      outputLines.push(`\nRule: ${block.title}`);
-      lastKeyword = null;
-      continue;
+      outputLines.push(`  Rule: ${block.title}`);
+      return;
     }
 
-    if (block.type === 'background') {
-      flushOutlineExamples();
-      outputLines.push(`  ${block.title ? `Background: ${block.title}` : 'Background:'}`);
-      lastKeyword = null;
-      processBlockLines(block.lines, outputLines, '    ', (kw) => { lastKeyword = kw; }, lastKeyword);
-      continue;
-    }
+    if (block.type === 'scenario' || block.type === 'outline') {
+      // Print scenario tags if attached
+      if (block.tags && block.tags.length > 0) {
+        block.tags.forEach(t => outputLines.push(`  ${t.trim()}`));
+      }
 
-    if (block.type === 'scenario') {
-      flushOutlineExamples();
-      let title = block.title || 'Standard User Operation';
-      if (scenarioTitlesSeen.has(title)) {
-        const count = scenarioTitlesSeen.get(title) + 1;
-        scenarioTitlesSeen.set(title, count);
+      // De-duplicate Scenario Names (rule: no-dupe-scenario-names)
+      let title = block.title || (block.type === 'outline' ? 'Data Driven Process' : 'Standard User Operation');
+      if (scenarioNamesSeen.has(title)) {
+        const count = scenarioNamesSeen.get(title) + 1;
+        scenarioNamesSeen.set(title, count);
         title = `${title} (${count})`;
       } else {
-        scenarioTitlesSeen.set(title, 1);
+        scenarioNamesSeen.set(title, 1);
       }
-      outputLines.push(`  Scenario: ${title}`);
-      lastKeyword = null;
-      processBlockLines(block.lines, outputLines, '    ', (kw) => { lastKeyword = kw; }, lastKeyword);
-      continue;
-    }
 
-    if (block.type === 'outline') {
-      flushOutlineExamples();
-      inOutline = true;
-      let title = block.title || 'Data Driven Operation';
-      if (scenarioTitlesSeen.has(title)) {
-        const count = scenarioTitlesSeen.get(title) + 1;
-        scenarioTitlesSeen.set(title, count);
-        title = `${title} (${count})`;
-      } else {
-        scenarioTitlesSeen.set(title, 1);
-      }
-      outputLines.push(`  Scenario Outline: ${title}`);
-      lastKeyword = null;
+      const keyword = block.type === 'outline' ? 'Scenario Outline' : 'Scenario';
+      outputLines.push(`  ${keyword}: ${title}`);
 
-      processBlockLines(block.lines, outputLines, '    ', (kw) => { lastKeyword = kw; }, lastKeyword, (ph) => {
-        outlinePlaceholders.add(ph);
-      });
-      continue;
-    }
-
-    if (block.type === 'examples') {
-      if (!inOutline) {
-        outputLines.push('  Scenario Outline: Data Driven User Flow');
-        inOutline = true;
-      }
-      outlineHasExamples = true;
-
-      block.lines.forEach(line => {
-        let trimmed = line.trim();
-        if (trimmed.startsWith('|') || trimmed.includes('|')) {
-          let tableRow = trimmed;
-          if (!tableRow.startsWith('|')) tableRow = '| ' + tableRow;
-          if (!tableRow.endsWith('|')) tableRow = tableRow + ' |';
-          const cells = tableRow.split('|').slice(1, -1).map(c => c.trim());
-
-          if (outlineExamplesHeader.length === 0) {
-            outlineExamplesHeader = cells;
-          } else {
-            outlineExamplesRows.push(cells);
-          }
-        }
-      });
-      continue;
-    }
-
-    if (block.type === 'tags') {
-      block.lines.forEach(line => {
-        let trimmed = line.trim();
-        if (trimmed) {
-          outputLines.push('  ' + trimmed);
-        }
-      });
-      continue;
-    }
-
-    if (block.lines.length > 0) {
-      let isTableOnly = block.lines.every(l => {
-        let t = l.trim();
-        return !t || t.startsWith('#') || t.startsWith('|') || t.includes('|');
+      // Extract placeholders e.g. <param_name>
+      const placeholders = new Set();
+      processStepBlockLines(block.lines, outputLines, '    ', (ph) => {
+        placeholders.add(ph);
       });
 
-      if (isTableOnly && inOutline && !outlineHasExamples) {
-        outlineHasExamples = true;
-        block.lines.forEach(line => {
-          let trimmed = line.trim();
-          if (trimmed.startsWith('|') || trimmed.includes('|')) {
-            let tableRow = trimmed;
-            if (!tableRow.startsWith('|')) tableRow = '| ' + tableRow;
-            if (!tableRow.endsWith('|')) tableRow = tableRow + ' |';
-            const cells = tableRow.split('|').slice(1, -1).map(c => c.trim());
+      // Handle Scenario Outline Examples Table
+      if (block.type === 'outline' || placeholders.size > 0) {
+        let examples = block.examples || { header: [], rows: [] };
+        const phList = Array.from(placeholders);
 
-            if (outlineExamplesHeader.length === 0) {
-              outlineExamplesHeader = cells;
-            } else {
-              outlineExamplesRows.push(cells);
-            }
+        let headerCols = [...examples.header];
+
+        // Ensure all step placeholders exist in header
+        phList.forEach(ph => {
+          if (!headerCols.includes(ph)) {
+            headerCols.push(ph);
           }
         });
-      } else {
-        processBlockLines(block.lines, outputLines, '    ', (kw) => { lastKeyword = kw; }, lastKeyword);
+
+        // Default headers if no placeholders and no headers existed
+        if (headerCols.length === 0) {
+          headerCols = ['param1', 'param2'];
+        }
+
+        outputLines.push('    Examples:');
+        outputLines.push(`      | ${headerCols.join(' | ')} |`);
+
+        // Format data rows
+        if (examples.rows.length > 0) {
+          examples.rows.forEach(row => {
+            let updatedRow = [...row];
+            while (updatedRow.length < headerCols.length) {
+              const missingColName = headerCols[updatedRow.length] || 'value';
+              updatedRow.push(`${missingColName}_val`);
+            }
+            if (updatedRow.length > headerCols.length) {
+              updatedRow = updatedRow.slice(0, headerCols.length);
+            }
+            outputLines.push(`      | ${updatedRow.join(' | ')} |`);
+          });
+        } else {
+          // Generate default data row
+          const defaultRow = headerCols.map(h => `${h}_val`);
+          outputLines.push(`      | ${defaultRow.join(' | ')} |`);
+        }
       }
+
+      outputLines.push('');
     }
-  }
+  });
 
-  flushOutlineExamples();
-
-  return outputLines.join('\n').replace(/\n{3,}/g, '\n\n');
+  return outputLines.join('\n');
 }
 
-
-function processBlockLines(lines, outputArr, indent, onKeywordChange, initialLastKeyword, onPlaceholderFound) {
-  let lastKw = initialLastKeyword || null;
+/**
+ * Process steps inside a block:
+ * - Fixes dangling conjunctions (starts with And/But -> Given)
+ * - Fixes repeated keywords (Given...Given -> Given...And)
+ * - Re-orders steps into logical Given -> When -> Then flow
+ * - Formats table rows under steps
+ */
+function processStepBlockLines(lines, outputArr, indent, onPlaceholderFound) {
+  const steps = [];
+  let currentStep = null;
+  let lastMainKw = null;
 
   for (let i = 0; i < lines.length; i++) {
-    let line = lines[i];
-    let trimmed = line.trim();
+    const rawLine = lines[i];
+    const trimmed = rawLine.trim();
 
-    if (!trimmed || trimmed.startsWith('#')) {
-      outputArr.push(trimmed);
+    if (!trimmed) continue;
+
+    // Check for step keyword
+    const stepMatch = trimmed.match(/^(given|when|then|and|but)\b\s*(.*)/i);
+
+    if (stepMatch) {
+      let rawKw = stepMatch[1].toLowerCase();
+      let kw = rawKw.charAt(0).toUpperCase() + rawKw.slice(1);
+      let text = stepMatch[2].trim();
+
+      // Rule: dangling-conjunction (And/But without preceding Given/When/Then)
+      if ((kw === 'And' || kw === 'But') && !lastMainKw) {
+        kw = 'Given';
+      }
+
+      // Rule: use-and (repeated consecutive Given/When/Then)
+      if (kw === 'Given' || kw === 'When' || kw === 'Then') {
+        if (lastMainKw === kw) {
+          kw = 'And';
+        } else {
+          lastMainKw = kw;
+        }
+      }
+
+      // Fix unclosed double quotes
+      const dQuotes = (text.match(/"/g) || []).length;
+      if (dQuotes % 2 !== 0) text += '"';
+
+      // Fix unclosed single quotes
+      const sQuotes = (text.match(/'/g) || []).length;
+      if (sQuotes % 2 !== 0) text += "'";
+
+      // Extract <placeholder> matches
+      const phMatches = text.match(/<([^>]+)>/g);
+      if (phMatches) {
+        phMatches.forEach(m => {
+          const phName = m.replace(/[<>]/g, '').trim();
+          if (phName && onPlaceholderFound) {
+            onPlaceholderFound(phName);
+          }
+        });
+      }
+
+      currentStep = {
+        keyword: kw,
+        text,
+        tables: []
+      };
+      steps.push(currentStep);
       continue;
     }
 
-    // Table rows inside steps
-    if (trimmed.startsWith('|') || trimmed.includes('|')) {
+    // Step Data Tables
+    if (trimmed.startsWith('|')) {
       let tableRow = trimmed;
       if (!tableRow.startsWith('|')) tableRow = '| ' + tableRow;
       if (!tableRow.endsWith('|')) tableRow = tableRow + ' |';
 
       const cells = tableRow.split('|').slice(1, -1).map(c => c.trim());
       const formattedRow = '| ' + cells.join(' | ') + ' |';
-      outputArr.push('      ' + formattedRow);
+
+      if (currentStep) {
+        currentStep.tables.push(formattedRow);
+      } else {
+        outputArr.push('      ' + formattedRow);
+      }
       continue;
     }
 
-    // Step keywords (Given, When, Then, And, But)
-    const stepMatch = trimmed.match(/^(given|when|then|and|but)\b/i);
-    if (stepMatch) {
-      let kw = stepMatch[1].toLowerCase();
-      let capKw = kw.charAt(0).toUpperCase() + kw.slice(1);
-      let stepText = trimmed.slice(stepMatch[0].length).trim();
-
-      // Rule 1: Fix dangling And/But step before any Given/When/Then
-      if ((capKw === 'And' || capKw === 'But') && !lastKw) {
-        capKw = 'Given';
-      }
-
-      // Rule 2: Fix repeated consecutive keywords (Given...Given -> Given...And)
-      if (capKw === 'Given' || capKw === 'When' || capKw === 'Then') {
-        if (lastKw === capKw) {
-          capKw = 'And';
-        } else {
-          lastKw = capKw;
-        }
-      }
-
-      onKeywordChange?.(lastKw);
-
-      // Rule 3: Fix unclosed double quotes
-      const dQuotes = (stepText.match(/"/g) || []).length;
-      if (dQuotes % 2 !== 0) {
-        stepText += '"';
-      }
-
-      // Rule 4: Fix unclosed single quotes
-      const sQuotes = (stepText.match(/'/g) || []).length;
-      if (sQuotes % 2 !== 0) {
-        stepText += "'";
-      }
-
-      // Extract placeholders e.g. <param>
-      if (onPlaceholderFound) {
-        const phMatches = stepText.match(/<([^>]+)>/g);
-        if (phMatches) {
-          phMatches.forEach(m => {
-            onPlaceholderFound(m.replace(/[<>]/g, '').trim());
-          });
-        }
-      }
-
-      outputArr.push(`${indent}${capKw} ${stepText}`);
-      continue;
+    // DocString lines or comments
+    if (currentStep) {
+      currentStep.tables.push(rawLine);
+    } else {
+      outputArr.push(indent + trimmed);
     }
-
-    // Fallback line
-    outputArr.push(line);
   }
+
+  // Group & Order steps into logical flow: Given steps -> When steps -> Then steps
+  const givenSteps = [];
+  const whenSteps = [];
+  const thenSteps = [];
+  const otherSteps = [];
+
+  let currentCategory = 'GIVEN';
+
+  steps.forEach(step => {
+    if (step.keyword === 'Given') {
+      currentCategory = 'GIVEN';
+    } else if (step.keyword === 'When') {
+      currentCategory = 'WHEN';
+    } else if (step.keyword === 'Then') {
+      currentCategory = 'THEN';
+    }
+
+    if (currentCategory === 'GIVEN') givenSteps.push(step);
+    else if (currentCategory === 'WHEN') whenSteps.push(step);
+    else if (currentCategory === 'THEN') thenSteps.push(step);
+    else otherSteps.push(step);
+  });
+
+  const orderedSteps = [...givenSteps, ...whenSteps, ...thenSteps, ...otherSteps];
+
+  orderedSteps.forEach(step => {
+    outputArr.push(`${indent}${step.keyword} ${step.text}`);
+    if (step.tables && step.tables.length > 0) {
+      step.tables.forEach(t => {
+        if (t.startsWith('|')) {
+          outputArr.push('      ' + t);
+        } else {
+          outputArr.push('      ' + t.trim());
+        }
+      });
+    }
+  });
 }
 
 /**
- * Fix a single line in Gherkin text given line number and error detail.
+ * Ensures clean Gherkin indentation, line spacing, and whitespace formatting
+ */
+function formatAndStructureGherkin(code) {
+  const lines = code.split('\n');
+  const formatted = [];
+
+  lines.forEach(rawLine => {
+    const trimmed = rawLine.trim();
+
+    if (!trimmed) {
+      if (formatted.length > 0 && formatted[formatted.length - 1] !== '') {
+        formatted.push('');
+      }
+      return;
+    }
+
+    if (trimmed.startsWith('Feature:')) {
+      formatted.push(trimmed);
+    } else if (trimmed.startsWith('Rule:')) {
+      formatted.push('\n' + trimmed);
+    } else if (trimmed.startsWith('Background:') || trimmed.startsWith('Scenario:') || trimmed.startsWith('Scenario Outline:') || trimmed.startsWith('Scenario Template:')) {
+      formatted.push('  ' + trimmed);
+    } else if (trimmed.startsWith('Examples:') || trimmed.startsWith('Scenarios:')) {
+      formatted.push('    ' + trimmed);
+    } else if (/^(Given|When|Then|And|But)\b/i.test(trimmed)) {
+      const stepMatch = trimmed.match(/^(Given|When|Then|And|But)\b\s*(.*)/i);
+      const kw = stepMatch[1].charAt(0).toUpperCase() + stepMatch[1].slice(1).toLowerCase();
+      formatted.push(`    ${kw} ${stepMatch[2]}`);
+    } else if (trimmed.startsWith('|')) {
+      const cells = trimmed.split('|').slice(1, -1).map(c => c.trim());
+      formatted.push(`      | ${cells.join(' | ')} |`);
+    } else if (trimmed.startsWith('@')) {
+      formatted.push('  ' + trimmed);
+    } else if (trimmed.startsWith('#')) {
+      formatted.push('  ' + trimmed);
+    } else {
+      formatted.push('  ' + trimmed);
+    }
+  });
+
+  return formatted.join('\n').replace(/\n{3,}/g, '\n\n').trim();
+}
+
+/**
+ * Fix a single targeted line in Gherkin text given line number and error detail.
  */
 export function fixSingleLine(code, lineNum, errorDetail) {
   if (!code) return code;
   const lines = code.split('\n');
   const index = lineNum - 1;
 
-  if (index < 0 || index >= lines.length) return code;
+  if (index < 0 || index >= lines.length) return autoFixGherkin(code);
 
   let line = lines[index];
   let trimmed = line.trim();
 
+  // Rule 1: No trailing spaces
+  if (errorDetail?.rule === 'no-trailing-spaces' || /\s+$/.test(line)) {
+    lines[index] = line.trimEnd();
+    return lines.join('\n');
+  }
+
+  // Rule 2: Unclosed double quotes
+  if (errorDetail?.rule === 'unclosed-double-quote' || (trimmed.match(/"/g) || []).length % 2 !== 0) {
+    lines[index] = line + '"';
+    return lines.join('\n');
+  }
+
+  // Rule 3: Unclosed single quotes
+  if (errorDetail?.rule === 'unclosed-single-quote' || (trimmed.match(/'/g) || []).length % 2 !== 0) {
+    lines[index] = line + "'";
+    return lines.join('\n');
+  }
+
+  // Rule 4: Table row pipe unclosed
+  if (errorDetail?.rule === 'table-row-pipe-unclosed' || (trimmed.startsWith('|') && !trimmed.endsWith('|'))) {
+    lines[index] = line + ' |';
+    return lines.join('\n');
+  }
+
+  // Rule 5: Indentation warnings
   if (errorDetail?.rule === 'indentation' || errorDetail?.category?.includes('Indentation')) {
     if (trimmed.startsWith('Feature:')) {
       lines[index] = trimmed;
@@ -455,20 +611,9 @@ export function fixSingleLine(code, lineNum, errorDetail) {
     } else if (trimmed.startsWith('|')) {
       lines[index] = '      ' + trimmed;
     }
-  } else if (errorDetail?.rule === 'no-trailing-spaces' || /\s+$/.test(line)) {
-    lines[index] = line.trimEnd();
-  } else if (/^(given|when|then|and|but)\b/i.test(trimmed)) {
-    const stepMatch = trimmed.match(/^(given|when|then|and|but)\b/i);
-    if (stepMatch) {
-      const matchedKw = stepMatch[1].toLowerCase();
-      const capitalizedKw = matchedKw.charAt(0).toUpperCase() + matchedKw.slice(1);
-      const stepText = trimmed.slice(stepMatch[0].length).trim();
-      lines[index] = `    ${capitalizedKw} ${stepText}`;
-    }
-  } else {
-    return autoFixGherkin(code);
+    return lines.join('\n');
   }
 
-  return lines.join('\n');
+  // Fallback to complete internal rule-based auto-fix
+  return autoFixGherkin(code);
 }
-

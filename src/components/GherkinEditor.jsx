@@ -60,15 +60,15 @@ export function GherkinEditor({ code, onChange, onRunTest, onAutoFix, isFixingWi
             <span>Test Gherkin</span>
           </button>
 
-          {/* AI Auto-Fix Button */}
+          {/* Rule-Based Auto-Fix Button */}
           <button
             onClick={onAutoFix}
             className={`btn-action ${isTested && hasIssues ? 'btn-autofix-active btn-claude-editor' : 'btn-ai-ghost'}`}
             disabled={!code.trim() || isFixingWithAI}
-            title="Claude AI fixes syntax and checker errors"
+            title="Internal rule-based engine repairs syntax, missing examples, quotes & indentations without AI"
           >
-            {isFixingWithAI ? <Loader2 size={13} className="spin-icon" /> : <Bot size={13} />}
-            <span>{isFixingWithAI ? 'Fixing...' : 'AI Fix'}</span>
+            {isFixingWithAI ? <Loader2 size={13} className="spin-icon" /> : <Sparkles size={13} />}
+            <span>{isFixingWithAI ? 'Fixing...' : 'Auto-Fix (No AI)'}</span>
           </button>
 
           <div className="action-divider"></div>

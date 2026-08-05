@@ -89,14 +89,14 @@ export function AnalysisDashboard({ results, isTested, onRunTest, onHighlightLin
           <p className="banner-desc">
             {overallPass
               ? 'Your Gherkin feature file satisfies @cucumber/gherkin AST specs, gherkin-lint quality standards, Matriz88 step consistency, and sistar lexing structure.'
-              : 'Review detailed breakdown below or click "Fix with AI" to automatically resolve syntax, keywords, and indentation.'}
+              : 'Review detailed breakdown below or click "Auto-Fix (No AI)" to automatically resolve syntax, keywords, and indentation using our internal rule engine.'}
           </p>
 
           {!overallPass && onAutoFix && (
             <div className="banner-action-row">
               <button onClick={onAutoFix} disabled={isFixingWithAI} className="btn-banner-autofix btn-claude-banner">
-                {isFixingWithAI ? <Loader2 size={15} className="spin-icon" /> : <Bot size={16} />}
-                <span>{isFixingWithAI ? 'Claude AI Repairing...' : 'Fix with Claude AI'}</span>
+                {isFixingWithAI ? <Loader2 size={15} className="spin-icon" /> : <Sparkles size={16} />}
+                <span>{isFixingWithAI ? 'Repairing...' : 'Auto-Fix (No AI)'}</span>
               </button>
             </div>
           )}
