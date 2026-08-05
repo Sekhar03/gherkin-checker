@@ -1,11 +1,9 @@
 import React, { useRef } from 'react';
-import { Upload, Download, Copy, Trash2, FileText, AlertCircle, AlertTriangle, Play, Loader2, Sparkles } from 'lucide-react';
+import { Upload, Download, Copy, Trash2, FileText, Play, Loader2, Sparkles, AlignLeft } from 'lucide-react';
+import { formatGherkinCode } from '../utils/autoFixer';
 
-export function GherkinEditor({ code, onChange, onRunTest, onAutoFix, isFixingWithAI, errorsByLine = {}, isTested, hasIssues }) {
+export function GherkinEditor({ code, onChange, onRunTest, onAutoFix, onFormat, isFixingWithAI, _errorsByLine = {}, isTested, hasIssues }) {
   const fileInputRef = useRef(null);
-  const textareaRef = useRef(null);
-
-  const lines = code ? code.split('\n') : [''];
 
   const handleFileUpload = (e) => {
     const file = e.target.files[0];
@@ -19,7 +17,13 @@ export function GherkinEditor({ code, onChange, onRunTest, onAutoFix, isFixingWi
   };
 
   const handleDownload = () => {
-    const blob = new Blob([code], { type: 'text/plain;charset=utf-8' });
+    if (!code || !code.trim()) return;
+
+    // Auto-format Gherkin code when export/download is initiated
+    const formatted = onFormat ? onFormat() : formatGherkinCode(code);
+    const contentToDownload = formatted || code;
+
+    const blob = new Blob([contentToDownload], { type: 'text/plain;charset=utf-8' });
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url;
@@ -71,6 +75,17 @@ export function GherkinEditor({ code, onChange, onRunTest, onAutoFix, isFixingWi
             <span>{isFixingWithAI ? 'Fixing...' : 'Auto-Fix (No AI)'}</span>
           </button>
 
+          {/* Dedicated Format Button */}
+          <button
+            onClick={onFormat}
+            className="btn-action btn-format"
+            disabled={!code.trim()}
+            title="Format Gherkin syntax, clean indentation (0/2/4/6 spaces), and normalize data tables"
+          >
+            <AlignLeft size={13} />
+            <span>Format Gherkin</span>
+          </button>
+
           <div className="action-divider"></div>
 
           <button onClick={() => fileInputRef.current?.click()} className="btn-action btn-icon-only" title="Upload .feature file">
@@ -85,7 +100,7 @@ export function GherkinEditor({ code, onChange, onRunTest, onAutoFix, isFixingWi
             style={{ display: 'none' }}
           />
 
-          <button onClick={handleDownload} className="btn-action btn-icon-only" disabled={!code.trim()} title="Export file">
+          <button onClick={handleDownload} className="btn-action btn-icon-only" disabled={!code.trim()} title="Auto-format and Export file">
             <Download size={14} />
             <span className="btn-label-desktop">Export</span>
           </button>
@@ -103,57 +118,22 @@ export function GherkinEditor({ code, onChange, onRunTest, onAutoFix, isFixingWi
       </div>
 
       <div className="editor-workspace">
-        {/* Line Numbers with Error Markers */}
         <div className="line-numbers">
-          {lines.map((_, index) => {
-            const lineNum = index + 1;
-            const lineErrors = isTested ? (errorsByLine[lineNum] || []) : [];
-            const hasError = lineErrors.some(e => e.reason);
-            const hasWarning = lineErrors.some(e => e.rule);
-
-            return (
-              <div
-                key={lineNum}
-                className={`line-num-item ${hasError ? 'has-error' : hasWarning ? 'has-warning' : ''}`}
-                title={hasError ? `Line ${lineNum}: ${lineErrors.map(e => e.reason).join('; ')}` : `Line ${lineNum}`}
-              >
-                <span>{lineNum}</span>
-                {hasError && <AlertCircle size={10} className="marker-icon error" />}
-                {!hasError && hasWarning && <AlertTriangle size={10} className="marker-icon warning" />}
-              </div>
-            );
-          })}
+          {(code ? code.split('\n') : ['']).map((_, i) => (
+            <div key={i + 1} className="line-number">
+              {i + 1}
+            </div>
+          ))}
         </div>
 
-        {/* Gherkin Code Textarea */}
         <textarea
-          ref={textareaRef}
-          className="code-textarea"
           value={code}
           onChange={(e) => onChange(e.target.value)}
-          placeholder={`Feature: User Authentication System\n\n  Scenario: Successful login with valid credentials\n    Given the user is on the login page\n    When the user enters valid username and password\n    Then the user should be redirected to dashboard\n\n# Paste or type Gherkin feature file above, then click 'Test Gherkin'`}
+          placeholder={`Feature: User Authentication System\n\n  Scenario: Successful Login with valid credentials\n    Given the user is on the login page\n    When the user submits valid credentials\n    Then the system redirects to dashboard`}
+          className="gherkin-textarea"
           spellCheck="false"
         />
-      </div>
-
-      <div className="editor-footer">
-        <div className="footer-meta">
-          <span>Lines: <strong>{lines.length}</strong></span>
-          <span className="dot-divider">•</span>
-          <span>Chars: <strong>{code.length}</strong></span>
-        </div>
-
-        {isTested && Object.keys(errorsByLine).length > 0 ? (
-          <span className="error-highlight-notice">
-            <AlertCircle size={13} /> {Object.keys(errorsByLine).length} line{Object.keys(errorsByLine).length === 1 ? '' : 's'} flagged with issues
-          </span>
-        ) : (
-          <span className="footer-status-text">
-            {isTested ? '✓ Syntax structure validated' : 'Ready for input'}
-          </span>
-        )}
       </div>
     </div>
   );
 }
-

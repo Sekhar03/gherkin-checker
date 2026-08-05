@@ -5,6 +5,15 @@ import { runAllCheckers } from '../validators/masterRunner.js';
  * Reads actual error & warning objects and their explicit suggested fix comments from all 4 checkers to repair both ERRORS and WARNINGS.
  */
 
+/**
+ * Dedicated Gherkin Formatter Engine
+ * Formats Gherkin text with standard indentation (0/2/4/6 spaces), clean line spacing, normalized tags & pipe tables.
+ */
+export function formatGherkinCode(code) {
+  if (!code || !code.trim()) return code;
+  return formatAndStructureGherkin(code);
+}
+
 export function autoFixGherkin(code, initialResults = null) {
   if (!code || !code.trim()) {
     return `Feature: User Feature Specification

@@ -6,7 +6,7 @@ import { ReportExporter } from './components/ReportExporter';
 import { AISettingsModal } from './components/AISettingsModal';
 import { SAMPLES } from './utils/samples';
 import { runAllCheckers } from './validators/masterRunner';
-import { autoFixGherkin, fixSingleLine } from './utils/autoFixer';
+import { autoFixGherkin, fixSingleLine, formatGherkinCode } from './utils/autoFixer';
 import { fixGherkinWithClaudeAI } from './utils/aiFixer';
 import './index.css';
 
@@ -133,6 +133,18 @@ export default function App() {
     setTimeout(() => setFixNotice(null), 3000);
   };
 
+  const handleFormatGherkin = () => {
+    if (!code || !code.trim()) return code;
+    const formatted = formatGherkinCode(code);
+    setCode(formatted);
+    if (isTested) {
+      handleRunTest(formatted);
+    }
+    setFixNotice('🎨 Gherkin document formatted!');
+    setTimeout(() => setFixNotice(null), 3000);
+    return formatted;
+  };
+
   const handleSelectSample = (sampleId) => {
     setCurrentSampleId(sampleId);
     const selected = SAMPLES.find(s => s.id === sampleId);
@@ -169,9 +181,11 @@ export default function App() {
         executionTimeMs={analysisResults?.executionTimeMs || '0.00'}
         isTested={isTested}
         onAutoFix={handleInternalAutoFix}
+        onFormat={handleFormatGherkin}
         onOpenAISettings={() => setIsAISettingsOpen(true)}
         isFixingWithAI={isFixingWithAI}
         hasIssues={(analysisResults?.totalErrors || 0) > 0 || (analysisResults?.totalWarnings || 0) > 0}
+        hasCode={!!code && !!code.trim()}
       />
 
       {/* Main Grid: Gherkin Editor & Analysis Dashboard */}
@@ -181,6 +195,7 @@ export default function App() {
           onChange={handleCodeChange}
           onRunTest={() => handleRunTest(code)}
           onAutoFix={handleInternalAutoFix}
+          onFormat={handleFormatGherkin}
           isFixingWithAI={isFixingWithAI}
           errorsByLine={analysisResults?.errorsByLine || {}}
           isTested={isTested}
@@ -202,6 +217,7 @@ export default function App() {
         <ReportExporter
           results={analysisResults}
           code={code}
+          onFormat={handleFormatGherkin}
         />
       )}
 

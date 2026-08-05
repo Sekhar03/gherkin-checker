@@ -1,8 +1,8 @@
 import React from 'react';
-import { ShieldCheck, Github, Sparkles, CheckCircle2, AlertTriangle, Play, Sun, Moon, Settings, Loader2, Code2, AlertCircle } from 'lucide-react';
+import { ShieldCheck, Github, Sparkles, CheckCircle2, AlertTriangle, Play, Sun, Moon, Settings, Loader2, Code2, AlertCircle, AlignLeft } from 'lucide-react';
 import { SAMPLES } from '../utils/samples';
 
-export function Header({ theme, onToggleTheme, currentSampleId, onSelectSample, totalErrors, totalWarnings, overallPass, executionTimeMs, isTested, onAutoFix, onOpenAISettings, isFixingWithAI, hasIssues }) {
+export function Header({ theme, onToggleTheme, currentSampleId, onSelectSample, totalErrors, totalWarnings, overallPass, executionTimeMs, isTested, onAutoFix, onFormat, onOpenAISettings, isFixingWithAI, hasIssues, hasCode }) {
   const repos = [
     { name: 'gherkin-lint', url: 'https://github.com/gherkin-lint/gherkin-lint', tag: 'Linter Rules' },
     { name: '@cucumber/gherkin', url: 'https://github.com/cucumber/gherkin-javascript', tag: 'Cucumber AST Parser' },
@@ -92,6 +92,16 @@ export function Header({ theme, onToggleTheme, currentSampleId, onSelectSample, 
                 <span>{isFixingWithAI ? 'Fixing...' : 'Auto-Fix (No AI)'}</span>
               </button>
             )}
+
+            <button
+              onClick={onFormat}
+              disabled={!hasCode}
+              className="theme-toggle-btn btn-format-header"
+              title="Format Gherkin syntax, clean indentation (0/2/4/6 spaces), and normalize data tables"
+            >
+              <AlignLeft size={14} />
+              <span>Format</span>
+            </button>
 
             <button
               onClick={onOpenAISettings}

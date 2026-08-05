@@ -606,6 +606,32 @@ body {
   border-color: var(--purple-accent);
 }
 
+.btn-format {
+  background: var(--bg-subtle);
+  border: 1px solid var(--border-color);
+  color: var(--blue-accent);
+  font-weight: 600;
+}
+
+.btn-format:hover:not(:disabled) {
+  background: var(--blue-accent-bg);
+  border-color: var(--blue-accent);
+  color: var(--blue-accent);
+  transform: translateY(-1px);
+}
+
+.btn-format-header {
+  background: var(--bg-card);
+  border: 1px solid var(--border-color);
+  color: var(--blue-accent);
+}
+
+.btn-format-header:hover:not(:disabled) {
+  background: var(--blue-accent-bg);
+  border-color: var(--blue-accent);
+  color: var(--blue-accent);
+}
+
 .btn-danger {
   color: var(--fail-red);
 }
