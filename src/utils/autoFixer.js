@@ -583,15 +583,50 @@ function refactorFirstPerson(text) {
 function refactorImperativeStep(text) {
   if (!text) return text;
   let refactored = text;
-  refactored = refactored.replace(/opens (a |the )?(web )?browser/i, 'the application is opened');
-  refactored = refactored.replace(/navigates to "https?:\/\/[^"]+"/i, 'the main page is displayed');
-  refactored = refactored.replace(/enters? "([^"]+)" into the search bar/i, 'searches for "$1"');
-  refactored = refactored.replace(/types? "([^"]+)" into (the |a )?([a-zA-Z0-9_-]+) (field|input)/i, 'enters "$1" for $3');
-  refactored = refactored.replace(/clicks? (on )?(the )?"([^"]+)" (link|button)/i, 'selects "$3"');
-  refactored = refactored.replace(/presses? (the )?confirm PIN button/i, 'confirms the PIN');
-  refactored = refactored.replace(/presses? (the )?withdrawal button/i, 'selects withdrawal');
-  refactored = refactored.replace(/presses? confirm/i, 'submits the request');
-  refactored = refactored.replace(/on the keypad/i, '');
+
+  // 1. Quoted hyperlink/link/button/tab click e.g. "click the 'View All' hyperlink on the landing page"
+  refactored = refactored.replace(/(the user |user )?clicks? (on |upon )?(the )?("([^"]+)"|'([^']+)')\s*(hyperlink|link|button|tab|menu item|option|toggle|checkbox|radio button|icon)?(\s+on the [a-zA-Z0-9_\s-]+ page|\s+on the [a-zA-Z0-9_\s-]+)?/gi, (match, p1, p2, p3, p4, qName1, qName2) => {
+    const targetName = (qName1 || qName2 || 'option').trim();
+    return `the user selects "${targetName}"`;
+  });
+
+  // 2. Unquoted element click e.g. "click the three-dot vertical icon menu on the ticket"
+  refactored = refactored.replace(/(the user |user )?clicks? (on |upon )?(the )?([a-zA-Z0-9_\s-]+) (hyperlink|link|button|icon menu|vertical icon|icon|menu|dropdown|tab|toggle)(\s+on the [a-zA-Z0-9_\s-]+ page|\s+on the [a-zA-Z0-9_\s-]+)?/gi, (match, p1, p2, p3, targetName) => {
+    return `the user selects the ${targetName.trim()} view`;
+  });
+
+  // 3. Unquoted generic click e.g. "click the View All hyperlink"
+  refactored = refactored.replace(/(the user |user )?clicks? (on |upon )?(the )?([a-zA-Z0-9_\s-]+)/gi, (match, p1, p2, p3, targetName) => {
+    let cleaned = targetName.replace(/\b(hyperlink|link|button|icon menu|vertical icon|icon|menu|dropdown|on the landing page|on the ticket|on the page)\b/gi, '').trim();
+    if (!cleaned) cleaned = 'option';
+    return `the user selects "${cleaned}"`;
+  });
+
+  // 4. Input / Type / Enter text patterns: "enters 'test' into the email input field"
+  refactored = refactored.replace(/(the user |user )?(types?|enters?|fills? in) "([^"]+)" into (the |a )?([a-zA-Z0-9_\s-]+) (field|input|textbox|search bar|box)/gi, (match, p1, p2, val, p4, fieldName) => {
+    return `the user provides "${val}" for ${fieldName.trim()}`;
+  });
+  refactored = refactored.replace(/(the user |user )?(types?|enters?|fills? in) "([^"]+)" into (the |a )?([a-zA-Z0-9_\s-]+)/gi, (match, p1, p2, val, p4, fieldName) => {
+    return `the user provides "${val}" for ${fieldName.trim()}`;
+  });
+
+  // 5. Browser navigation & URL patterns
+  refactored = refactored.replace(/(the user |user )?opens? (a |the )?(web )?browser/gi, 'the application is launched');
+  refactored = refactored.replace(/(the user |user )?navigates? to "https?:\/\/[^"]+"/gi, 'the main landing page is displayed');
+  refactored = refactored.replace(/(the user |user )?navigates? to (the )?([a-zA-Z0-9_\s-]+) page/gi, 'the $3 page is displayed');
+
+  // 6. Keypad / button press residual patterns
+  refactored = refactored.replace(/presses? (the )?confirm PIN button/gi, 'confirms the PIN');
+  refactored = refactored.replace(/presses? (the )?withdrawal button/gi, 'selects withdrawal');
+  refactored = refactored.replace(/presses? confirm/gi, 'submits the request');
+  refactored = refactored.replace(/\bpresses?\b/gi, 'submits');
+  refactored = refactored.replace(/\bclicks?\b/gi, 'selects');
+  refactored = refactored.replace(/\btypes?\b/gi, 'provides');
+  refactored = refactored.replace(/\bhyperlink\b/gi, 'option');
+  refactored = refactored.replace(/\bicon menu\b/gi, 'menu');
+  refactored = refactored.replace(/\bvertical icon\b/gi, 'menu');
+  refactored = refactored.replace(/on the keypad/gi, '');
+
   return refactored.replace(/\s+/g, ' ').trim();
 }
 
