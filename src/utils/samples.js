@@ -32,6 +32,66 @@ export const SAMPLES = [
 `
   },
   {
+    id: 'cucumber_official',
+    name: '🥒 Official Cucumber Spec (Gherkin 6+ Rules)',
+    description: 'Official Cucumber standard fixture with Rule blocks, Backgrounds, and Example synonyms.',
+    code: `Feature: Customer Membership Tier Management
+  As a loyalty program manager
+  I want to calculate tier upgrades and benefits
+  So that active members receive appropriate perks
+
+  Background:
+    Given the customer membership database is initialized
+    And standard discount rates are loaded
+
+  Rule: Gold Tier Qualification Rule
+    Members with over 1000 points qualify for Gold benefits
+
+    Example: Tier upgrade upon reaching threshold
+      Given customer "Alice" has 950 points
+      When customer "Alice" makes a purchase worth 100 points
+      Then customer "Alice" total points should be 1050
+      And customer "Alice" membership status should be upgraded to "Gold"
+
+  Rule: Platinum Tier Qualification Rule
+    Members with over 5000 points qualify for Platinum benefits
+
+    Scenario Outline: Bulk tier calculation for high volume shoppers
+      Given customer "<CustomerName>" has points "<InitialPoints>"
+      When customer "<CustomerName>" completes a transaction of "<NewPoints>" points
+      Then customer "<CustomerName>" final tier should be "<FinalTier>"
+
+      Examples:
+        | CustomerName | InitialPoints | NewPoints | FinalTier |
+        | Bob          | 4800          | 300       | Platinum  |
+        | Charlie      | 2000          | 3500      | Platinum  |
+`
+  },
+  {
+    id: 'cucumber_docstrings',
+    name: '📄 Official Cucumber DataTables & DocStrings Spec',
+    description: 'Official Cucumber spec showcasing multiline DocString blocks and pipe DataTables.',
+    code: `Feature: API Webhook Notification Processing
+
+  Scenario: Receive and process JSON webhook payload
+    Given the API webhook endpoint "https://api.merchant.com/webhooks" is active
+    When a HTTP POST request is received with body:
+      """
+      {
+        "event": "payment_completed",
+        "transactionId": "TXN_987654",
+        "amount": 49.99,
+        "currency": "USD",
+        "status": "SUCCESS"
+      }
+      """
+    Then the response status code should be 200
+    And the database table "webhook_logs" should contain:
+      | Transaction ID | Event Name        | Status  |
+      | TXN_987654     | payment_completed | SUCCESS |
+`
+  },
+  {
     id: 'syntax_error',
     name: '❌ Syntax & Lexing Errors',
     description: 'Triggers syntax errors in @cucumber/gherkin and sistar/gherkin-validator.',

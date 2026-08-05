@@ -13,6 +13,8 @@ export function Header({ theme, onToggleTheme, currentSampleId, onSelectSample, 
   // Helper for cleaner sample titles
   const getSampleShortName = (sample) => {
     if (sample.id === 'valid') return 'Valid Feature';
+    if (sample.id === 'cucumber_official') return 'Cucumber Official Spec';
+    if (sample.id === 'cucumber_docstrings') return 'DocStrings & Tables';
     if (sample.id === 'syntax_error') return 'Syntax Errors';
     if (sample.id === 'linter_issue') return 'Linter Violations';
     if (sample.id === 'inconsistent_step') return 'Inconsistent Steps';
@@ -21,6 +23,7 @@ export function Header({ theme, onToggleTheme, currentSampleId, onSelectSample, 
 
   const getSampleIcon = (sampleId) => {
     if (sampleId === 'valid') return <CheckCircle2 size={13} className="text-green" />;
+    if (sampleId === 'cucumber_official' || sampleId === 'cucumber_docstrings') return <Sparkles size={13} className="text-emerald" />;
     if (sampleId === 'syntax_error') return <AlertCircle size={13} className="text-red" />;
     if (sampleId === 'linter_issue') return <AlertTriangle size={13} className="text-amber" />;
     return <Code2 size={13} />;
