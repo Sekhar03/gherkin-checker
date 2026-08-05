@@ -126,8 +126,8 @@ export function checkGherkinLint(gherkinText, config = {}) {
       continue;
     }
 
-    // Scenario / Scenario Outline check
-    if (trimmedLine.startsWith('Scenario:') || trimmedLine.startsWith('Scenario Outline:') || trimmedLine.startsWith('Scenario Template:')) {
+    // Scenario / Scenario Outline / Example check (Gherkin 6+ standard)
+    if (trimmedLine.startsWith('Scenario:') || trimmedLine.startsWith('Scenario Outline:') || trimmedLine.startsWith('Scenario Template:') || trimmedLine.startsWith('Example:')) {
       if (currentScenarioType === 'Scenario Outline' && !currentScenarioHasExamples) {
         result.pass = false;
         result.errors.push({

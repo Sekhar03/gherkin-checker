@@ -35,8 +35,8 @@ export function checkSistarLexer(gherkinText) {
   let inTable = false;
 
   const validKeywordPrefixes = [
-    'Feature:', 'Background:', 'Scenario:', 'Scenario Outline:', 'Scenario Template:',
-    'Examples:', 'Scenarios:', 'Given', 'When', 'Then', 'And', 'But',
+    'Feature:', 'Background:', 'Scenario:', 'Scenario Outline:', 'Scenario Template:', 'Example:',
+    'Examples:', 'Scenarios:', 'Given', 'When', 'Then', 'And', 'But', '*',
     '#', '@', '|', '"""', "'''"
   ];
 

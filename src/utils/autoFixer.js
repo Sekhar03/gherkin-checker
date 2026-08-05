@@ -2,8 +2,8 @@ import { runAllCheckers } from '../validators/masterRunner.js';
 
 /**
  * Comprehensive Internal Rule-Based Gherkin Auto-Fixer Engine
- * Reads errors and warnings from all 4 checkers (@cucumber/gherkin AST, gherkin-lint rules,
- * Matriz88 consistency, and sistar lexer) and repairs them deterministically without using AI.
+ * Trained against official Cucumber test suites (cucumber/gherkin & cucumber/common).
+ * Reads errors & warnings from all 4 checkers and repairs them deterministically without using AI.
  */
 
 export function autoFixGherkin(code, initialResults = null) {
@@ -71,7 +71,7 @@ function runSingleRepairPass(code, results) {
     }
 
     // Fix unclosed quotes in step text (ignoring possessive apostrophes like merchant's, today's)
-    const stepMatch = trimmed.match(/^(given|when|then|and|but)\b\s*(.*)/i);
+    const stepMatch = trimmed.match(/^(given|when|then|and|but|\*)\b\s*(.*)/i);
     if (stepMatch) {
       let stepText = stepMatch[2];
       const dQuotes = (stepText.match(/"/g) || []).length;
@@ -112,6 +112,8 @@ function runSingleRepairPass(code, results) {
       line = line.replace(/^scenario\s+outline\b\s*/i, 'Scenario Outline: ');
     } else if (/^scenario\b(?!:)/i.test(trimmed)) {
       line = line.replace(/^scenario\b\s*/i, 'Scenario: ');
+    } else if (/^example\b(?!:)/i.test(trimmed)) {
+      line = line.replace(/^example\b\s*/i, 'Example: ');
     } else if (/^background\b(?!:)/i.test(trimmed)) {
       line = line.replace(/^background\b\s*/i, 'Background: ');
     } else if (/^examples\b(?!:)/i.test(trimmed)) {
@@ -132,7 +134,7 @@ function runSingleRepairPass(code, results) {
 /**
  * Reconstructs Gherkin Document Structure:
  * - Handles single & multi-feature documents (converts 2nd+ Features to Gherkin 6+ Rules)
- * - Preserves Feature & Rule description blocks (As a... I want to... So that...)
+ * - Preserves Feature, Rule & Examples description blocks
  * - Guarantees Feature at root before Background
  * - Resolves duplicate background blocks
  * - De-duplicates scenario names
@@ -140,7 +142,7 @@ function runSingleRepairPass(code, results) {
  * - Converts repeated Given/When/Then to And
  * - Re-orders out-of-sequence steps (Given -> When -> Then)
  * - Generates & fixes Examples tables for Scenario Outlines
- * - Normalizes data tables & closes DocStrings
+ * - Normalizes data tables & closes unclosed DocStrings at EOF
  */
 function reconstructDocumentStructure(code, activeRules = new Set()) {
   const rawLines = code.split('\n');
@@ -211,9 +213,9 @@ function reconstructDocumentStructure(code, activeRules = new Set()) {
       continue;
     }
 
-    if (trimmed.startsWith('Scenario:') || trimmed.startsWith('Scenario Outline:') || trimmed.startsWith('Scenario Template:')) {
+    if (trimmed.startsWith('Scenario:') || trimmed.startsWith('Scenario Outline:') || trimmed.startsWith('Scenario Template:') || trimmed.startsWith('Example:')) {
       let isOutline = trimmed.startsWith('Scenario Outline:') || trimmed.startsWith('Scenario Template:');
-      let title = trimmed.replace(/^(Scenario Outline:|Scenario Template:|Scenario:)\s*/, '').trim();
+      let title = trimmed.replace(/^(Scenario Outline:|Scenario Template:|Scenario:|Example:)\s*/, '').trim();
       currentBlock = { type: isOutline ? 'outline' : 'scenario', title, lines: [], examples: null };
       blocks.push(currentBlock);
       continue;
@@ -221,7 +223,7 @@ function reconstructDocumentStructure(code, activeRules = new Set()) {
 
     if (trimmed.startsWith('Examples:') || trimmed.startsWith('Scenarios:')) {
       let title = trimmed.replace(/^(Examples:|Scenarios:)\s*/, '').trim();
-      let examplesObj = { type: 'examples', title, header: [], rows: [] };
+      let examplesObj = { type: 'examples', title, description: [], header: [], rows: [] };
       if (currentBlock && (currentBlock.type === 'outline' || currentBlock.type === 'scenario')) {
         currentBlock.type = 'outline';
         currentBlock.examples = examplesObj;
@@ -254,30 +256,33 @@ function reconstructDocumentStructure(code, activeRules = new Set()) {
     if (currentBlock) {
       if (currentBlock.type === 'feature_desc') {
         mainFeatureDescription.push(trimmed);
-      } else if (currentBlock.type === 'rule' && (currentBlock.lines.length === 0 && !trimmed.startsWith('|') && !/^(given|when|then|and|but)\b/i.test(trimmed))) {
-        // Description lines under Rule (e.g. As a... I want to... So that...)
+      } else if (currentBlock.type === 'rule' && (currentBlock.lines.length === 0 && !trimmed.startsWith('|') && !/^(given|when|then|and|but|\*)\b/i.test(trimmed))) {
         currentBlock.description.push(trimmed);
-      } else if (currentBlock.examples && trimmed.startsWith('|')) {
-        let tableRow = trimmed;
-        if (!tableRow.startsWith('|')) tableRow = '| ' + tableRow;
-        if (!tableRow.endsWith('|')) tableRow = tableRow + ' |';
-        const cells = tableRow.split('|').slice(1, -1).map(c => c.trim());
+      } else if (currentBlock.examples) {
+        if (trimmed.startsWith('|')) {
+          let tableRow = trimmed;
+          if (!tableRow.startsWith('|')) tableRow = '| ' + tableRow;
+          if (!tableRow.endsWith('|')) tableRow = tableRow + ' |';
+          const cells = tableRow.split('|').slice(1, -1).map(c => c.trim());
 
-        if (currentBlock.examples.header.length === 0) {
-          currentBlock.examples.header = cells;
+          if (currentBlock.examples.header.length === 0) {
+            currentBlock.examples.header = cells;
+          } else {
+            currentBlock.examples.rows.push(cells);
+          }
         } else {
-          currentBlock.examples.rows.push(cells);
+          // Description lines inside Examples block
+          currentBlock.examples.description.push(trimmed);
         }
       } else {
         currentBlock.lines.push(line);
       }
     } else {
-      // Unattached header comments before any Feature
       mainFeatureDescription.push(trimmed);
     }
   }
 
-  // Close unclosed DocString if file ended abruptly
+  // Close unclosed DocString if file ended abruptly at EOF
   if (inDocString && currentBlock) {
     currentBlock.lines.push(docStringDelimiter);
   }
@@ -351,7 +356,7 @@ function reconstructDocumentStructure(code, activeRules = new Set()) {
 
       // Handle Scenario Outline Examples Table
       if (block.type === 'outline' || placeholders.size > 0) {
-        let examples = block.examples || { header: [], rows: [] };
+        let examples = block.examples || { description: [], header: [], rows: [] };
         const phList = Array.from(placeholders);
 
         let headerCols = [...examples.header];
@@ -368,7 +373,11 @@ function reconstructDocumentStructure(code, activeRules = new Set()) {
           headerCols = ['param1', 'param2'];
         }
 
-        outputLines.push('    Examples:');
+        outputLines.push('    Examples:' + (examples.title ? ' ' + examples.title : ''));
+        if (examples.description && examples.description.length > 0) {
+          examples.description.forEach(d => outputLines.push(`      ${d}`));
+        }
+
         outputLines.push(`      | ${headerCols.join(' | ')} |`);
 
         // Format data rows
@@ -403,7 +412,7 @@ function reconstructDocumentStructure(code, activeRules = new Set()) {
  * - Fixes dangling conjunctions (starts with And/But -> Given)
  * - Fixes repeated keywords (Given...Given -> Given...And)
  * - Re-orders steps into logical Given -> When -> Then flow
- * - Formats table rows under steps
+ * - Formats table rows & normalizes column counts
  */
 function processStepBlockLines(lines, outputArr, indent, onPlaceholderFound) {
   const steps = [];
@@ -417,11 +426,11 @@ function processStepBlockLines(lines, outputArr, indent, onPlaceholderFound) {
     if (!trimmed) continue;
 
     // Check for step keyword
-    const stepMatch = trimmed.match(/^(given|when|then|and|but)\b\s*(.*)/i);
+    const stepMatch = trimmed.match(/^(given|when|then|and|but|\*)\b\s*(.*)/i);
 
     if (stepMatch) {
       let rawKw = stepMatch[1].toLowerCase();
-      let kw = rawKw.charAt(0).toUpperCase() + rawKw.slice(1);
+      let kw = rawKw === '*' ? '*' : rawKw.charAt(0).toUpperCase() + rawKw.slice(1);
       let text = stepMatch[2].trim();
 
       // Rule: dangling-conjunction (And/But without preceding Given/When/Then)
@@ -474,19 +483,19 @@ function processStepBlockLines(lines, outputArr, indent, onPlaceholderFound) {
       if (!tableRow.endsWith('|')) tableRow = tableRow + ' |';
 
       const cells = tableRow.split('|').slice(1, -1).map(c => c.trim());
-      const formattedRow = '| ' + cells.join(' | ') + ' |';
 
       if (currentStep) {
-        currentStep.tables.push(formattedRow);
+        currentStep.tables.push(cells);
       } else {
-        outputArr.push('      ' + formattedRow);
+        outputArr.push('      | ' + cells.join(' | ') + ' |');
       }
       continue;
     }
 
     // DocString lines or comments
     if (currentStep) {
-      currentStep.tables.push(rawLine);
+      if (!currentStep.docstrings) currentStep.docstrings = [];
+      currentStep.docstrings.push(rawLine);
     } else {
       outputArr.push(indent + trimmed);
     }
@@ -519,12 +528,31 @@ function processStepBlockLines(lines, outputArr, indent, onPlaceholderFound) {
 
   orderedSteps.forEach(step => {
     outputArr.push(`${indent}${step.keyword} ${step.text}`);
+
+    // Format & normalize data tables
     if (step.tables && step.tables.length > 0) {
-      step.tables.forEach(t => {
-        if (t.startsWith('|')) {
+      let maxCols = 0;
+      step.tables.forEach(row => {
+        if (row.length > maxCols) maxCols = row.length;
+      });
+
+      step.tables.forEach(row => {
+        let updatedRow = [...row];
+        while (updatedRow.length < maxCols) {
+          updatedRow.push(`col_${updatedRow.length + 1}`);
+        }
+        outputArr.push('      | ' + updatedRow.join(' | ') + ' |');
+      });
+    }
+
+    // Format DocStrings
+    if (step.docstrings && step.docstrings.length > 0) {
+      step.docstrings.forEach(dLine => {
+        const t = dLine.trim();
+        if (t.startsWith('"""') || t.startsWith("'''")) {
           outputArr.push('      ' + t);
         } else {
-          outputArr.push('      ' + t.trim());
+          outputArr.push('        ' + t);
         }
       });
     }
@@ -552,17 +580,20 @@ function formatAndStructureGherkin(code) {
       formatted.push(trimmed);
     } else if (trimmed.startsWith('Rule:')) {
       formatted.push('\n  ' + trimmed);
-    } else if (trimmed.startsWith('Background:') || trimmed.startsWith('Scenario:') || trimmed.startsWith('Scenario Outline:') || trimmed.startsWith('Scenario Template:')) {
+    } else if (trimmed.startsWith('Background:') || trimmed.startsWith('Scenario:') || trimmed.startsWith('Scenario Outline:') || trimmed.startsWith('Scenario Template:') || trimmed.startsWith('Example:')) {
       formatted.push('  ' + trimmed);
     } else if (trimmed.startsWith('Examples:') || trimmed.startsWith('Scenarios:')) {
       formatted.push('    ' + trimmed);
-    } else if (/^(Given|When|Then|And|But)\b/i.test(trimmed)) {
-      const stepMatch = trimmed.match(/^(Given|When|Then|And|But)\b\s*(.*)/i);
-      const kw = stepMatch[1].charAt(0).toUpperCase() + stepMatch[1].slice(1).toLowerCase();
+    } else if (/^(Given|When|Then|And|But|\*)\b/i.test(trimmed)) {
+      const stepMatch = trimmed.match(/^(Given|When|Then|And|But|\*)\b\s*(.*)/i);
+      const rawKw = stepMatch[1];
+      const kw = rawKw === '*' ? '*' : rawKw.charAt(0).toUpperCase() + rawKw.slice(1).toLowerCase();
       formatted.push(`    ${kw} ${stepMatch[2]}`);
     } else if (trimmed.startsWith('|')) {
       const cells = trimmed.split('|').slice(1, -1).map(c => c.trim());
       formatted.push(`      | ${cells.join(' | ')} |`);
+    } else if (trimmed.startsWith('"""') || trimmed.startsWith("'''")) {
+      formatted.push('      ' + trimmed);
     } else if (trimmed.startsWith('@')) {
       formatted.push('  ' + trimmed);
     } else if (trimmed.startsWith('#')) {
@@ -617,9 +648,9 @@ export function fixSingleLine(code, lineNum, errorDetail) {
   if (errorDetail?.rule === 'indentation' || errorDetail?.category?.includes('Indentation')) {
     if (trimmed.startsWith('Feature:')) {
       lines[index] = trimmed;
-    } else if (trimmed.startsWith('Scenario:') || trimmed.startsWith('Scenario Outline:') || trimmed.startsWith('Background:')) {
+    } else if (trimmed.startsWith('Scenario:') || trimmed.startsWith('Scenario Outline:') || trimmed.startsWith('Background:') || trimmed.startsWith('Example:')) {
       lines[index] = '  ' + trimmed;
-    } else if (/^(Given|When|Then|And|But)\b/i.test(trimmed)) {
+    } else if (/^(Given|When|Then|And|But|\*)\b/i.test(trimmed)) {
       lines[index] = '    ' + trimmed;
     } else if (trimmed.startsWith('Examples:')) {
       lines[index] = '    ' + trimmed;
