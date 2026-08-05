@@ -45,25 +45,18 @@ export function autoFixGherkin(code, initialResults = null) {
 function runSingleRepairPass(code, results) {
   const lines = code.split('\n');
 
-  // Collect error & warning rules per line
-  const lineIssues = {};
+  // Collect active error & warning rules
   const activeRules = new Set();
-
   if (results && results.checkers) {
     results.checkers.forEach(c => {
       [...(c.errors || []), ...(c.warnings || [])].forEach(issue => {
         if (issue.rule) activeRules.add(issue.rule);
-        if (issue.line) {
-          if (!lineIssues[issue.line]) lineIssues[issue.line] = [];
-          lineIssues[issue.line].push(issue);
-        }
       });
     });
   }
 
   // Pass 1: Targeted Line-Level Fixes
   for (let i = 0; i < lines.length; i++) {
-    const lineNum = i + 1;
     let line = lines[i];
     let trimmed = line.trim();
 
@@ -77,7 +70,7 @@ function runSingleRepairPass(code, results) {
       line = line.trimEnd();
     }
 
-    // Fix unclosed double quote in step text
+    // Fix unclosed quotes in step text (ignoring possessive apostrophes like merchant's, today's)
     const stepMatch = trimmed.match(/^(given|when|then|and|but)\b\s*(.*)/i);
     if (stepMatch) {
       let stepText = stepMatch[2];
@@ -87,7 +80,8 @@ function runSingleRepairPass(code, results) {
         trimmed = line.trim();
       }
 
-      const sQuotes = (stepText.match(/'/g) || []).length;
+      const codeQuotesOnly = stepText.replace(/[a-zA-Z]'[a-zA-Z]/g, '');
+      const sQuotes = (codeQuotesOnly.match(/'/g) || []).length;
       if (sQuotes % 2 !== 0) {
         line = line + "'";
         trimmed = line.trim();
@@ -111,16 +105,7 @@ function runSingleRepairPass(code, results) {
       line = '  ' + cleaned;
     }
 
-    // Fix unnamed Feature header
-    if (/^feature\s*:?/i.test(trimmed)) {
-      let title = trimmed.replace(/^feature\s*:?\s*/i, '').trim();
-      if (!title) {
-        title = 'User Feature Specification';
-      }
-      line = `Feature: ${title}`;
-    }
-
-    // Fix missing colon on Feature / Scenario / Background / Examples / Rules
+    // Fix missing colon on keywords
     if (/^feature\b(?!:)/i.test(trimmed)) {
       line = line.replace(/^feature\b\s*/i, 'Feature: ');
     } else if (/^scenario\s+outline\b(?!:)/i.test(trimmed)) {
@@ -146,7 +131,9 @@ function runSingleRepairPass(code, results) {
 
 /**
  * Reconstructs Gherkin Document Structure:
- * - Guarantees Feature at root
+ * - Handles single & multi-feature documents (converts 2nd+ Features to Gherkin 6+ Rules)
+ * - Preserves Feature & Rule description blocks (As a... I want to... So that...)
+ * - Guarantees Feature at root before Background
  * - Resolves duplicate background blocks
  * - De-duplicates scenario names
  * - Fixes dangling conjunctions (And/But before Given)
@@ -158,16 +145,16 @@ function runSingleRepairPass(code, results) {
 function reconstructDocumentStructure(code, activeRules = new Set()) {
   const rawLines = code.split('\n');
 
-  let hasFeature = false;
-  let featureTitle = 'User Feature Specification';
-  let featureDescriptionLines = [];
+  let mainFeatureTitle = null;
+  let mainFeatureDescription = [];
   let backgroundBlock = null;
   let blocks = [];
   let currentBlock = null;
   let inDocString = false;
   let docStringDelimiter = '"""';
 
-  // 1. Tokenize lines into structured Gherkin blocks
+  let featureCount = 0;
+
   for (let i = 0; i < rawLines.length; i++) {
     let line = rawLines[i];
     let trimmed = line.trim();
@@ -192,9 +179,19 @@ function reconstructDocumentStructure(code, activeRules = new Set()) {
 
     if (!trimmed) continue;
 
+    // Detect Feature headers
     if (trimmed.startsWith('Feature:')) {
-      hasFeature = true;
-      featureTitle = trimmed.replace(/^Feature:\s*/, '').trim() || 'User Feature Specification';
+      featureCount++;
+      const title = trimmed.replace(/^Feature:\s*/, '').trim() || 'User Feature Specification';
+
+      if (featureCount === 1) {
+        mainFeatureTitle = title;
+        currentBlock = { type: 'feature_desc', lines: [] };
+      } else {
+        // Convert 2nd+ Feature: to Rule: (Gherkin 6+ standard)
+        currentBlock = { type: 'rule', title, description: [], lines: [], examples: null };
+        blocks.push(currentBlock);
+      }
       continue;
     }
 
@@ -209,7 +206,7 @@ function reconstructDocumentStructure(code, activeRules = new Set()) {
 
     if (trimmed.startsWith('Rule:')) {
       let title = trimmed.replace(/^Rule:\s*/, '').trim() || 'Business Rule';
-      currentBlock = { type: 'rule', title, lines: [] };
+      currentBlock = { type: 'rule', title, description: [], lines: [], examples: null };
       blocks.push(currentBlock);
       continue;
     }
@@ -226,10 +223,9 @@ function reconstructDocumentStructure(code, activeRules = new Set()) {
       let title = trimmed.replace(/^(Examples:|Scenarios:)\s*/, '').trim();
       let examplesObj = { type: 'examples', title, header: [], rows: [] };
       if (currentBlock && (currentBlock.type === 'outline' || currentBlock.type === 'scenario')) {
-        currentBlock.type = 'outline'; // Ensure block is outline if it has Examples
+        currentBlock.type = 'outline';
         currentBlock.examples = examplesObj;
       } else {
-        // Standalone Examples block -> convert to new Scenario Outline
         currentBlock = { type: 'outline', title: 'Data Driven Flow', lines: [], examples: examplesObj };
         blocks.push(currentBlock);
       }
@@ -254,8 +250,14 @@ function reconstructDocumentStructure(code, activeRules = new Set()) {
       continue;
     }
 
+    // Process line according to current block context
     if (currentBlock) {
-      if (currentBlock.examples && trimmed.startsWith('|')) {
+      if (currentBlock.type === 'feature_desc') {
+        mainFeatureDescription.push(trimmed);
+      } else if (currentBlock.type === 'rule' && (currentBlock.lines.length === 0 && !trimmed.startsWith('|') && !/^(given|when|then|and|but)\b/i.test(trimmed))) {
+        // Description lines under Rule (e.g. As a... I want to... So that...)
+        currentBlock.description.push(trimmed);
+      } else if (currentBlock.examples && trimmed.startsWith('|')) {
         let tableRow = trimmed;
         if (!tableRow.startsWith('|')) tableRow = '| ' + tableRow;
         if (!tableRow.endsWith('|')) tableRow = tableRow + ' |';
@@ -270,8 +272,8 @@ function reconstructDocumentStructure(code, activeRules = new Set()) {
         currentBlock.lines.push(line);
       }
     } else {
-      // Header comments or Feature description
-      featureDescriptionLines.push(line);
+      // Unattached header comments before any Feature
+      mainFeatureDescription.push(trimmed);
     }
   }
 
@@ -280,17 +282,22 @@ function reconstructDocumentStructure(code, activeRules = new Set()) {
     currentBlock.lines.push(docStringDelimiter);
   }
 
+  // Fallback main feature title if none existed
+  if (!mainFeatureTitle) {
+    mainFeatureTitle = 'Merchant Support Portal & Feature Specification';
+  }
+
   // 2. Output Re-construction
   const outputLines = [];
 
-  // Feature Header
-  outputLines.push(`Feature: ${featureTitle}`);
-  featureDescriptionLines.forEach(l => {
+  // Primary Feature Header
+  outputLines.push(`Feature: ${mainFeatureTitle}`);
+  mainFeatureDescription.forEach(l => {
     if (l.trim()) outputLines.push(`  ${l.trim()}`);
   });
   outputLines.push('');
 
-  // Primary Background Block
+  // Primary Background Block (must come under Feature before Rules/Scenarios)
   if (backgroundBlock) {
     outputLines.push(`  Background:${backgroundBlock.title ? ' ' + backgroundBlock.title : ''}`);
     processStepBlockLines(backgroundBlock.lines, outputLines, '    ');
@@ -307,7 +314,13 @@ function reconstructDocumentStructure(code, activeRules = new Set()) {
     }
 
     if (block.type === 'rule') {
-      outputLines.push(`  Rule: ${block.title}`);
+      outputLines.push(`\n  Rule: ${block.title}`);
+      if (block.description && block.description.length > 0) {
+        block.description.forEach(descLine => {
+          outputLines.push(`    ${descLine}`);
+        });
+        outputLines.push('');
+      }
       return;
     }
 
@@ -429,8 +442,9 @@ function processStepBlockLines(lines, outputArr, indent, onPlaceholderFound) {
       const dQuotes = (text.match(/"/g) || []).length;
       if (dQuotes % 2 !== 0) text += '"';
 
-      // Fix unclosed single quotes
-      const sQuotes = (text.match(/'/g) || []).length;
+      // Fix unclosed single quotes (ignoring possessive/contraction apostrophes like merchant's)
+      const codeQuotesOnly = text.replace(/[a-zA-Z]'[a-zA-Z]/g, '');
+      const sQuotes = (codeQuotesOnly.match(/'/g) || []).length;
       if (sQuotes % 2 !== 0) text += "'";
 
       // Extract <placeholder> matches
@@ -537,7 +551,7 @@ function formatAndStructureGherkin(code) {
     if (trimmed.startsWith('Feature:')) {
       formatted.push(trimmed);
     } else if (trimmed.startsWith('Rule:')) {
-      formatted.push('\n' + trimmed);
+      formatted.push('\n  ' + trimmed);
     } else if (trimmed.startsWith('Background:') || trimmed.startsWith('Scenario:') || trimmed.startsWith('Scenario Outline:') || trimmed.startsWith('Scenario Template:')) {
       formatted.push('  ' + trimmed);
     } else if (trimmed.startsWith('Examples:') || trimmed.startsWith('Scenarios:')) {
@@ -586,8 +600,9 @@ export function fixSingleLine(code, lineNum, errorDetail) {
     return lines.join('\n');
   }
 
-  // Rule 3: Unclosed single quotes
-  if (errorDetail?.rule === 'unclosed-single-quote' || (trimmed.match(/'/g) || []).length % 2 !== 0) {
+  // Rule 3: Unclosed single quotes (ignoring possessive apostrophes like merchant's)
+  const codeQuotesOnly = trimmed.replace(/[a-zA-Z]'[a-zA-Z]/g, '');
+  if (errorDetail?.rule === 'unclosed-single-quote' || (codeQuotesOnly.match(/'/g) || []).length % 2 !== 0) {
     lines[index] = line + "'";
     return lines.join('\n');
   }

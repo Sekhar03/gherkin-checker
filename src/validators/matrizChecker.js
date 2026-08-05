@@ -110,8 +110,9 @@ export function checkMatrizConsistency(gherkinText) {
         });
       }
 
-      // Check unclosed single quotes
-      const singleQuotesCount = (stepText.match(/'/g) || []).length;
+      // Check unclosed single quotes (ignoring possessive/contraction apostrophes like merchant's, today's)
+      const codeQuotesOnly = stepText.replace(/[a-zA-Z]'[a-zA-Z]/g, '');
+      const singleQuotesCount = (codeQuotesOnly.match(/'/g) || []).length;
       if (singleQuotesCount % 2 !== 0) {
         result.pass = false;
         result.errors.push({
