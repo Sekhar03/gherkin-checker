@@ -1,9 +1,19 @@
 import React, { useRef } from 'react';
-import { Upload, Download, Copy, Trash2, FileText, Play, Loader2, Sparkles, AlignLeft } from 'lucide-react';
+import { Upload, Download, Copy, Trash2, FileText, Play, Loader2, Sparkles, AlignLeft, AlertCircle, AlertTriangle } from 'lucide-react';
 import { formatGherkinCode } from '../utils/autoFixer';
 
-export function GherkinEditor({ code, onChange, onRunTest, onAutoFix, onFormat, isFixingWithAI, _errorsByLine = {}, isTested, hasIssues }) {
+export function GherkinEditor({ code, onChange, onRunTest, onAutoFix, onFormat, isFixingWithAI, errorsByLine = {}, isTested, hasIssues }) {
   const fileInputRef = useRef(null);
+  const textareaRef = useRef(null);
+  const gutterRef = useRef(null);
+
+  const lines = code ? code.split('\n') : [''];
+
+  const handleScroll = () => {
+    if (textareaRef.current && gutterRef.current) {
+      gutterRef.current.scrollTop = textareaRef.current.scrollTop;
+    }
+  };
 
   const handleFileUpload = (e) => {
     const file = e.target.files[0];
@@ -118,19 +128,35 @@ export function GherkinEditor({ code, onChange, onRunTest, onAutoFix, onFormat, 
       </div>
 
       <div className="editor-workspace">
-        <div className="line-numbers">
-          {(code ? code.split('\n') : ['']).map((_, i) => (
-            <div key={i + 1} className="line-number">
-              {i + 1}
-            </div>
-          ))}
+        <div className="line-numbers" ref={gutterRef}>
+          {lines.map((_, i) => {
+            const lineNum = i + 1;
+            const lineIssues = errorsByLine[lineNum] || [];
+            const hasError = lineIssues.some(iss => !iss.isWarning);
+            const hasWarning = !hasError && lineIssues.some(iss => iss.isWarning);
+
+            return (
+              <div
+                key={lineNum}
+                className={`line-num-item ${hasError ? 'has-error' : ''} ${hasWarning ? 'has-warning' : ''}`}
+                title={lineIssues.map(iss => iss.reason).join('\n')}
+              >
+                <span>{lineNum}</span>
+                {hasError && <AlertCircle size={11} className="marker-icon text-red" />}
+                {hasWarning && <AlertTriangle size={11} className="marker-icon text-amber" />}
+              </div>
+            );
+          })}
         </div>
 
         <textarea
+          ref={textareaRef}
           value={code}
           onChange={(e) => onChange(e.target.value)}
+          onScroll={handleScroll}
+          wrap="off"
           placeholder={`Feature: User Authentication System\n\n  Scenario: Successful Login with valid credentials\n    Given the user is on the login page\n    When the user submits valid credentials\n    Then the system redirects to dashboard`}
-          className="gherkin-textarea"
+          className="code-textarea gherkin-textarea"
           spellCheck="false"
         />
       </div>

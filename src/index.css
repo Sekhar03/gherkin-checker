@@ -685,23 +685,26 @@ body {
   margin-left: 2px;
 }
 
-.code-textarea {
+.code-textarea,
+.gherkin-textarea {
   flex: 1;
   background: transparent;
   border: none;
   color: var(--text-main);
-  font-family: 'Fira Code', monospace;
+  font-family: 'Fira Code', 'Consolas', monospace;
   font-size: 0.85rem;
   line-height: 24px;
   padding: 0.75rem;
   resize: none;
   outline: none;
   white-space: pre;
-  overflow: auto;
+  overflow-x: auto;
+  overflow-y: auto;
   tab-size: 2;
 }
 
-.code-textarea::placeholder {
+.code-textarea::placeholder,
+.gherkin-textarea::placeholder {
   color: var(--text-subtle);
   opacity: 0.75;
   font-family: 'Fira Code', monospace;
