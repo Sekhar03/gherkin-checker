@@ -1,6 +1,6 @@
 /**
  * gherkin-lint engine implementation
- * Extended with Gherkin Best Practices & Anti-Pattern Rules
+ * Extended with Gherkin Best Practices & Actionable Fix Recommendations
  * https://github.com/gherkin-lint/gherkin-lint
  */
 
@@ -299,39 +299,43 @@ export function checkGherkinLint(gherkinText, _config = {}) {
 
       // Rule: no-ending-punctuation
       if (/[.,;:]$/.test(stepText)) {
+        const cleanStep = stepText.slice(0, -1).trim();
         result.warnings.push({
           line: lineNum,
           text: rawLine,
           category: 'Style Warning',
           rule: 'no-ending-punctuation',
           reason: `Step line ${lineNum} ends with punctuation "${stepText.slice(-1)}". Gherkin style rules specify steps should not end with punctuation.`,
-          fix: 'Remove trailing period or punctuation at the end of this step line.',
+          fix: `Change step to "${keyword} ${cleanStep}" to remove trailing punctuation.`,
           checker: 'gherkin-lint'
         });
       }
 
       // Rule: imperative-steps-warning (imperative UI actions)
-      if (/\b(clicks?|press(es)?|types?|enters? .* into (the|a)|opens? (a |the )?(web )?browser|navigates? to "http|on the keypad|the withdrawal button)\b/i.test(stepText)) {
+      const isImperative = /\b(clicks?|press(es)?|types?|enters? .* (into|in)|opens? (a |the )?(web )?browser|navigates? to|hyperlink|icon menu|vertical icon|radio button|checkbox|dropdown|keypad|modal|popup)\b/i.test(stepText);
+      if (isImperative) {
+        const suggestedFixText = generateImperativeStepFixText(keyword, stepText);
         result.warnings.push({
           line: lineNum,
           text: rawLine,
           category: 'Anti-Pattern Warning',
           rule: 'imperative-steps-warning',
           reason: `Step describes low-level procedural/imperative UI detail ("${stepText}"). Prefer high-level declarative business language (describe what, not how).`,
-          fix: 'Refactor step to express user intent (e.g. "When the user submits credentials").',
+          fix: suggestedFixText,
           checker: 'gherkin-lint'
         });
       }
 
       // Rule: no-first-person-perspective
       if (/\b(I|my)\b/.test(stepText) && !/\b(API|ID|IP)\b/.test(stepText)) {
+        const cleanFirstPerson = refactorFirstPersonText(stepText);
         result.warnings.push({
           line: lineNum,
           text: rawLine,
           category: 'Style Warning',
           rule: 'no-first-person-perspective',
           reason: `Step uses first-person phrasing ("I" / "my"). Standard Gherkin guidelines prefer role-based actor phrasing.`,
-          fix: 'Replace "I" / "my" with role/actor phrasing (e.g., "the customer", "the account balance").',
+          fix: `Change step to "${keyword} ${cleanFirstPerson}" to use third-person role phrasing.`,
           checker: 'gherkin-lint'
         });
       }
@@ -374,7 +378,7 @@ export function checkGherkinLint(gherkinText, _config = {}) {
             category: 'Flow Warning',
             rule: 'keywords-in-logical-order',
             reason: `"Given" step defined after "${stepOrderState}" step. Steps should follow logical Given ➔ When ➔ Then flow.`,
-            fix: 'Move precondition "Given" steps above "When" and "Then" action steps.',
+            fix: `Change "${keyword}" to "And" on line ${lineNum} to maintain Given-When-Then flow.`,
             checker: 'gherkin-lint'
           });
         } else {
@@ -389,7 +393,7 @@ export function checkGherkinLint(gherkinText, _config = {}) {
             category: 'Anti-Pattern Warning',
             rule: 'one-behavior-per-scenario',
             reason: `Scenario contains multiple "When" actions (Line ${lineNum}). Each Scenario must cover exactly one unit of behavior.`,
-            fix: 'Split into separate scenarios, each with one Given-When-Then sequence.',
+            fix: `Change "When" to "And" on line ${lineNum} to preserve single behavior focus.`,
             checker: 'gherkin-lint'
           });
         }
@@ -400,7 +404,7 @@ export function checkGherkinLint(gherkinText, _config = {}) {
             category: 'Flow Warning',
             rule: 'keywords-in-logical-order',
             reason: `"When" action step defined after "THEN" assertion step. Steps should follow Given ➔ When ➔ Then flow.`,
-            fix: 'Place "When" action steps before "Then" assertion steps.',
+            fix: `Change "When" to "And" on line ${lineNum} to maintain Given-When-Then flow.`,
             checker: 'gherkin-lint'
           });
         } else {
@@ -474,4 +478,71 @@ export function checkGherkinLint(gherkinText, _config = {}) {
   }
 
   return result;
+}
+
+/**
+ * Generate actionable, concrete Change step to "..." fix text for imperative steps
+ */
+function generateImperativeStepFixText(keyword, stepText) {
+  let refactored = stepText;
+
+  // 1. Quoted hyperlink/link/button/tab click e.g. "click the 'View All' hyperlink on the landing page"
+  refactored = refactored.replace(/(the user |user )?clicks? (on |upon )?(the )?("([^"]+)"|'([^']+)').*/gi, (match, p1, p2, p3, p4, qName1, qName2) => {
+    const targetName = (qName1 || qName2 || 'option').trim();
+    return `the user selects "${targetName}"`;
+  });
+
+  // 2. Unquoted hyperlink/link/button/icon menu click e.g. "click the three-dot vertical icon menu on the ticket"
+  refactored = refactored.replace(/(the user |user )?clicks? (on |upon )?(the )?([a-zA-Z0-9_\s-]+) (hyperlink|link|button|icon menu|vertical icon|icon|menu|dropdown|tab|toggle).*/gi, (match, p1, p2, p3, targetName) => {
+    return `the user selects "${targetName.trim()}"`;
+  });
+
+  // 3. Unquoted generic click
+  refactored = refactored.replace(/(the user |user )?clicks? (on |upon )?(the )?([a-zA-Z0-9_\s-]+)/gi, (match, p1, p2, p3, targetName) => {
+    let cleaned = targetName.replace(/\b(hyperlink|link|button|icon menu|vertical icon|icon|menu|dropdown|on the landing page|on the ticket|on the page)\b/gi, '').trim();
+    if (!cleaned || cleaned === 'the user' || cleaned === 'user') cleaned = 'option';
+    return `the user selects "${cleaned}"`;
+  });
+
+  // 4. Input field / type patterns
+  refactored = refactored.replace(/(the user |user )?(types?|enters?|fills? in) "([^"]+)" into (the |a )?([a-zA-Z0-9_\s-]+).*/gi, (match, p1, p2, val, p4, fieldName) => {
+    return `the user provides "${val}" for ${fieldName.replace(/\b(field|input|textbox|box)\b/gi, '').trim()}`;
+  });
+
+  // 5. Browser / navigation
+  refactored = refactored.replace(/(the user |user )?opens? (a |the )?(web )?browser.*/gi, 'the application is launched');
+  refactored = refactored.replace(/(the user |user )?navigates? to .*/gi, 'the main page is displayed');
+
+  // Residual cleanups
+  refactored = refactored.replace(/\bclicks?\b/gi, 'selects');
+  refactored = refactored.replace(/\bpresses?\b/gi, 'submits');
+  refactored = refactored.replace(/\btypes?\b/gi, 'provides');
+  refactored = refactored.replace(/\bhyperlink\b/gi, 'option');
+  refactored = refactored.replace(/\bicon menu\b/gi, 'menu');
+  refactored = refactored.replace(/\bvertical icon\b/gi, 'menu');
+
+  refactored = refactored.replace(/\s+/g, ' ').trim();
+  if (/[.,;:]$/.test(refactored)) refactored = refactored.slice(0, -1).trim();
+
+  return `Change step to "${keyword} ${refactored}" to use declarative business language.`;
+}
+
+/**
+ * Refactor First-Person "I" / "my" text
+ */
+function refactorFirstPersonText(text) {
+  if (!text) return text;
+  return text
+    .replace(/\bI am\b/g, 'the user is')
+    .replace(/\bI authenticated\b/g, 'the user is authenticated')
+    .replace(/\bmy account balance\b/g, 'the account balance')
+    .replace(/\bmy account\b/g, 'the user account')
+    .replace(/\bI insert\b/g, 'the user inserts')
+    .replace(/\bI enter\b/g, 'the user enters')
+    .replace(/\bI press\b/g, 'the user presses')
+    .replace(/\bI get\b/g, 'the user receives')
+    .replace(/\bI navigate\b/g, 'the user navigates')
+    .replace(/\bI open\b/g, 'the user opens')
+    .replace(/\bI\b/g, 'the user')
+    .replace(/\bmy\b/g, 'the');
 }
