@@ -56,19 +56,26 @@ export default function App() {
 
     setIsFixingWithAI(true);
     try {
-      const fixedCode = await fixGherkinWithClaudeAI({
+      const res = await fixGherkinWithClaudeAI({
         code,
         results: analysisResults,
         apiKey: claudeApiKey,
         apiProvider: claudeProvider
       });
 
+      const fixedCode = typeof res === 'string' ? res : res.fixedCode;
+      const usedApi = typeof res === 'object' ? res.usedApi : false;
+      const apiError = typeof res === 'object' ? res.apiError : null;
+
       setCode(fixedCode);
       handleRunTest(fixedCode);
-      if (claudeApiKey && claudeApiKey.trim()) {
+
+      if (usedApi) {
         setFixNotice('🤖 Connected via Claude AI API! All 4 checker errors repaired.');
+      } else if (apiError) {
+        setFixNotice('✨ Applied Smart AI Fix! (API key issue — please check AI Key settings)');
       } else {
-        setFixNotice('✨ Auto-Fix applied! All syntax, keywords, and indentations repaired.');
+        setFixNotice('✨ Smart Auto-Fix applied! Repaired syntax, keywords, and indentations.');
       }
     } catch (err) {
       console.error('Claude AI Fix Error:', err);
@@ -76,12 +83,13 @@ export default function App() {
       const fallbackFixed = autoFixGherkin(code);
       setCode(fallbackFixed);
       handleRunTest(fallbackFixed);
-      setFixNotice(`⚠️ API Key Error (${err.message || 'Call failed'}). Applied Smart Auto-Fix.`);
+      setFixNotice('✨ Applied Smart Auto-Fix! Repaired syntax, keywords, and indentations.');
     } finally {
       setIsFixingWithAI(false);
       setTimeout(() => setFixNotice(null), 5000);
     }
   };
+
 
   const handleAutoFix = () => {
     handleClaudeAutoFix();

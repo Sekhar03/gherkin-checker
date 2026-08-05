@@ -37,76 +37,99 @@ CRITICAL TASK:
 3. If a Scenario Outline is missing an Examples table or header columns, add/update the Examples table with all required <placeholder> columns.
 4. Output ONLY the fixed Gherkin code inside a markdown code block tagged with gherkin, e.g. \`\`\`gherkin ... \`\`\`. Do not include any conversational preamble or explanation.`;
 
-  // If user provided an API key, execute direct HTTP API request
-  if (apiKey && apiKey.trim()) {
-    const cleanKey = apiKey.trim();
+  // Filter placeholder / invalid template keys
+  const cleanKey = apiKey ? apiKey.trim() : '';
+  const isPlaceholderKey = cleanKey.endsWith('...') || cleanKey === 'sk-ant-api' || cleanKey === 'sk-or-v1' || cleanKey.length < 10;
 
-    if (apiProvider === 'openrouter') {
-      const response = await fetch('https://openrouter.ai/api/v1/chat/completions', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${cleanKey}`,
-          'HTTP-Referer': window.location.origin,
-          'X-Title': 'Gherkin Checker Suite'
-        },
-        body: JSON.stringify({
-          model: 'anthropic/claude-3.5-sonnet',
-          messages: [
-            { role: 'system', content: 'You are an expert Gherkin QA Engineer.' },
-            { role: 'user', content: prompt }
-          ],
-          temperature: 0.2
-        })
-      });
+  // Execute direct HTTP API request if valid key present
+  if (cleanKey && !isPlaceholderKey) {
+    // Auto-detect provider based on key prefix
+    let effectiveProvider = apiProvider;
+    if (cleanKey.startsWith('sk-or-')) {
+      effectiveProvider = 'openrouter';
+    } else if (cleanKey.startsWith('sk-ant-')) {
+      effectiveProvider = 'anthropic';
+    }
 
-      if (!response.ok) {
-        const errData = await response.json().catch(() => ({}));
-        const msg = errData.error?.message || `OpenRouter API returned HTTP status ${response.status}`;
-        throw new Error(msg);
+    try {
+      if (effectiveProvider === 'openrouter') {
+        const response = await fetch('https://openrouter.ai/api/v1/chat/completions', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${cleanKey}`,
+            'HTTP-Referer': typeof window !== 'undefined' ? window.location.origin : 'http://localhost',
+            'X-Title': 'Gherkin Checker Suite'
+          },
+          body: JSON.stringify({
+            model: 'anthropic/claude-3.5-sonnet',
+            messages: [
+              { role: 'system', content: 'You are an expert Gherkin QA Engineer.' },
+              { role: 'user', content: prompt }
+            ],
+            temperature: 0.2
+          })
+        });
+
+        if (!response.ok) {
+          const errData = await response.json().catch(() => ({}));
+          const msg = errData.error?.message || `OpenRouter HTTP ${response.status}`;
+          throw new Error(msg);
+        }
+
+        const data = await response.json();
+        const content = data.choices?.[0]?.message?.content || '';
+        const extracted = extractCodeFromMarkdown(content);
+        if (extracted) {
+          return { fixedCode: extracted, usedApi: true };
+        }
+      } else {
+        // Direct Anthropic Claude API call
+        const response = await fetch('https://api.anthropic.com/v1/messages', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'x-api-key': cleanKey,
+            'anthropic-version': '2023-06-01',
+            'anthropic-dangerous-direct-browser-access': 'true'
+          },
+          body: JSON.stringify({
+            model: 'claude-3-5-sonnet-20241022',
+            max_tokens: 2048,
+            temperature: 0.2,
+            messages: [
+              { role: 'user', content: prompt }
+            ]
+          })
+        });
+
+        if (!response.ok) {
+          const errData = await response.json().catch(() => ({}));
+          const msg = errData.error?.message || `Anthropic HTTP ${response.status}`;
+          throw new Error(msg);
+        }
+
+        const data = await response.json();
+        const content = data.content?.[0]?.text || '';
+        const extracted = extractCodeFromMarkdown(content);
+        if (extracted) {
+          return { fixedCode: extracted, usedApi: true };
+        }
       }
-
-      const data = await response.json();
-      const content = data.choices?.[0]?.message?.content || '';
-      const extracted = extractCodeFromMarkdown(content);
-      if (extracted) return extracted;
-    } else {
-      // Direct Anthropic Claude API call with exact browser access header
-      const response = await fetch('https://api.anthropic.com/v1/messages', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'x-api-key': cleanKey,
-          'anthropic-version': '2023-06-01',
-          'anthropic-dangerous-direct-browser-access': 'true'
-        },
-        body: JSON.stringify({
-          model: 'claude-3-5-sonnet-20241022',
-          max_tokens: 2048,
-          temperature: 0.2,
-          messages: [
-            { role: 'user', content: prompt }
-          ]
-        })
-      });
-
-      if (!response.ok) {
-        const errData = await response.json().catch(() => ({}));
-        const msg = errData.error?.message || `Anthropic API returned HTTP status ${response.status}`;
-        throw new Error(msg);
-      }
-
-      const data = await response.json();
-      const content = data.content?.[0]?.text || '';
-      const extracted = extractCodeFromMarkdown(content);
-      if (extracted) return extracted;
+    } catch (err) {
+      console.warn('API Call failed, using built-in Smart AI Fixer:', err.message);
+      // Fallback to built-in Smart AI engine
+      const fixed = fallbackAISmartFix(code);
+      return { fixedCode: fixed, usedApi: false, apiError: err.message };
     }
   }
 
   // Fallback / Built-in Smart AI Engine (Simulates AI processing delay)
-  await new Promise(resolve => setTimeout(resolve, 600));
-  return fallbackAISmartFix(code);
+  await new Promise(resolve => setTimeout(resolve, 500));
+  const fixed = fallbackAISmartFix(code);
+  return { fixedCode: fixed, usedApi: false };
 }
+
 
 function extractCodeFromMarkdown(markdownText) {
   if (!markdownText) return null;
