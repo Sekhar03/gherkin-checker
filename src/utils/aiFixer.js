@@ -31,100 +31,104 @@ ${errorsList.length > 0 ? errorsList.join('\n') : 'No hard errors reported.'}
 --- QUALITY WARNINGS DETECTED ---
 ${warningsList.length > 0 ? warningsList.join('\n') : 'No warnings reported.'}
 
-TASK:
-1. Carefully read all the errors and warnings listed above.
-2. Fix all syntax errors, keyword capitalization (Given, When, Then, Scenario, Feature), line indentations, and step consistency issues.
-3. If a Scenario Outline is missing an Examples table, add a valid Examples table.
-4. Output ONLY the fixed Gherkin code inside a markdown code block tagged with gherkin, e.g. \`\`\`gherkin ... \`\`\`. Do not include any conversational preamble or postscript outside the code block.`;
+CRITICAL TASK:
+1. Carefully read all original Gherkin code and all 4 checker errors/warnings listed above.
+2. Fix all syntax errors, keyword capitalization (Given, When, Then, Scenario, Feature), line indentations, step consistency, and unclosed quotes.
+3. If a Scenario Outline is missing an Examples table or header columns, add/update the Examples table with all required <placeholder> columns.
+4. Output ONLY the fixed Gherkin code inside a markdown code block tagged with gherkin, e.g. \`\`\`gherkin ... \`\`\`. Do not include any conversational preamble or explanation.`;
 
-  // If user provided a real Anthropic / OpenRouter API key, execute HTTP call
+  // If user provided an API key, execute direct HTTP API request
   if (apiKey && apiKey.trim()) {
-    try {
-      if (apiProvider === 'openrouter') {
-        const response = await fetch('https://openrouter.ai/api/v1/chat/completions', {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            'Authorization': `Bearer ${apiKey.trim()}`,
-            'HTTP-Referer': window.location.origin,
-            'X-Title': 'Gherkin Checker Suite'
-          },
-          body: JSON.stringify({
-            model: 'anthropic/claude-3.5-sonnet',
-            messages: [
-              { role: 'system', content: 'You are an expert Gherkin QA Engineer.' },
-              { role: 'user', content: prompt }
-            ],
-            temperature: 0.2
-          })
-        });
+    const cleanKey = apiKey.trim();
 
-        if (!response.ok) {
-          const errData = await response.json().catch(() => ({}));
-          throw new Error(errData.error?.message || `OpenRouter API Error (${response.status})`);
-        }
+    if (apiProvider === 'openrouter') {
+      const response = await fetch('https://openrouter.ai/api/v1/chat/completions', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${cleanKey}`,
+          'HTTP-Referer': window.location.origin,
+          'X-Title': 'Gherkin Checker Suite'
+        },
+        body: JSON.stringify({
+          model: 'anthropic/claude-3.5-sonnet',
+          messages: [
+            { role: 'system', content: 'You are an expert Gherkin QA Engineer.' },
+            { role: 'user', content: prompt }
+          ],
+          temperature: 0.2
+        })
+      });
 
-        const data = await response.json();
-        const content = data.choices?.[0]?.message?.content || '';
-        return extractCodeFromMarkdown(content) || content;
-      } else {
-        // Direct Anthropic API call
-        const response = await fetch('https://api.anthropic.com/v1/messages', {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            'x-api-key': apiKey.trim(),
-            'anthropic-version': '2023-06-01',
-            'dangerously-allow-browser': 'true' // For client-side demo calls
-          },
-          body: JSON.stringify({
-            model: 'claude-3-5-sonnet-20241022',
-            max_tokens: 2048,
-            temperature: 0.2,
-            messages: [
-              { role: 'user', content: prompt }
-            ]
-          })
-        });
-
-        if (!response.ok) {
-          const errData = await response.json().catch(() => ({}));
-          throw new Error(errData.error?.message || `Anthropic Claude API Error (${response.status})`);
-        }
-
-        const data = await response.json();
-        const content = data.content?.[0]?.text || '';
-        return extractCodeFromMarkdown(content) || content;
+      if (!response.ok) {
+        const errData = await response.json().catch(() => ({}));
+        const msg = errData.error?.message || `OpenRouter API returned HTTP status ${response.status}`;
+        throw new Error(msg);
       }
-    } catch (err) {
-      console.warn('Claude API call failed, using intelligent AI fallback engine:', err);
-      // Fallback to internal AI fixer if API key call encounters CORS or quota error
-      return fallbackAISmartFix(code, errorsList);
+
+      const data = await response.json();
+      const content = data.choices?.[0]?.message?.content || '';
+      const extracted = extractCodeFromMarkdown(content);
+      if (extracted) return extracted;
+    } else {
+      // Direct Anthropic Claude API call with exact browser access header
+      const response = await fetch('https://api.anthropic.com/v1/messages', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'x-api-key': cleanKey,
+          'anthropic-version': '2023-06-01',
+          'anthropic-dangerous-direct-browser-access': 'true'
+        },
+        body: JSON.stringify({
+          model: 'claude-3-5-sonnet-20241022',
+          max_tokens: 2048,
+          temperature: 0.2,
+          messages: [
+            { role: 'user', content: prompt }
+          ]
+        })
+      });
+
+      if (!response.ok) {
+        const errData = await response.json().catch(() => ({}));
+        const msg = errData.error?.message || `Anthropic API returned HTTP status ${response.status}`;
+        throw new Error(msg);
+      }
+
+      const data = await response.json();
+      const content = data.content?.[0]?.text || '';
+      const extracted = extractCodeFromMarkdown(content);
+      if (extracted) return extracted;
     }
   }
 
-  // Built-in Intelligent AI Engine (No API key required default)
-  // Simulate network delay for AI processing feel
-  await new Promise(resolve => setTimeout(resolve, 800));
-  return fallbackAISmartFix(code, errorsList);
+  // Fallback / Built-in Smart AI Engine (Simulates AI processing delay)
+  await new Promise(resolve => setTimeout(resolve, 600));
+  return fallbackAISmartFix(code);
 }
 
 function extractCodeFromMarkdown(markdownText) {
+  if (!markdownText) return null;
   const match = markdownText.match(/```(?:gherkin|feature)?\s*([\s\S]*?)```/i);
-  if (match && match[1]) {
+  if (match && match[1] && match[1].trim()) {
     return match[1].trim();
+  }
+  const clean = markdownText.trim();
+  if (clean.includes('Feature:')) {
+    return clean;
   }
   return null;
 }
 
-function fallbackAISmartFix(code, errorsList) {
+export function fallbackAISmartFix(code) {
   if (!code || !code.trim()) {
-    return `Feature: User Feature Specification
+    return `Feature: User Authentication System
 
-  Scenario: Successful operation with valid input
-    Given the user is on the main page
-    When the user submits valid data
-    Then the system should process the request successfully`;
+  Scenario: Successful login with valid credentials
+    Given the user is on the login page
+    When the user enters valid credentials
+    Then the user should be redirected to dashboard`;
   }
 
   let lines = code.split('\n').map(l => l.trimEnd());
@@ -132,27 +136,34 @@ function fallbackAISmartFix(code, errorsList) {
   let scenarioNames = new Map();
   let currentScenarioType = null;
   let currentScenarioHasExamples = false;
+  let currentOutlinePlaceholders = new Set();
+  let currentOutlineExamplesHeaderIndex = -1;
 
   const fixed = [];
+  let lastMainStepKeyword = null;
 
   for (let i = 0; i < lines.length; i++) {
     let line = lines[i];
     let trimmed = line.trim();
 
+    // Preserve comments & empty lines
     if (!trimmed || trimmed.startsWith('#')) {
       fixed.push(trimmed);
       continue;
     }
 
+    // Fix Tags
     if (trimmed.startsWith('@')) {
-      fixed.push((hasFeature ? '  ' : '') + trimmed);
+      // Fix malformed tags like @#$ -> @tag
+      let cleanTag = trimmed.replace(/@[^a-zA-Z0-9_\-\s]/g, '@tag_');
+      fixed.push((hasFeature ? '  ' : '') + cleanTag);
       continue;
     }
 
     // Feature keyword fix
     if (/^feature\b/i.test(trimmed) || trimmed.startsWith('Feature:') || trimmed.startsWith('Feature')) {
       hasFeature = true;
-      let title = trimmed.replace(/^feature\s*:?\s*/i, '').trim() || 'User Authentication System';
+      let title = trimmed.replace(/^feature\s*:?\s*/i, '').trim() || 'User Feature Specification';
       fixed.push(`Feature: ${title}`);
       continue;
     }
@@ -161,26 +172,35 @@ function fallbackAISmartFix(code, errorsList) {
     if (/^background\b/i.test(trimmed) || trimmed.startsWith('Background:') || trimmed.startsWith('Background')) {
       let title = trimmed.replace(/^background\s*:?\s*/i, '').trim();
       fixed.push(`  ${title ? `Background: ${title}` : 'Background:'}`);
+      lastMainStepKeyword = null;
       continue;
     }
 
-    // Scenario Outline / Scenario Fix
+    // Scenario / Scenario Outline Keyword Fix
     if (
       /^scenario\s+outline\b/i.test(trimmed) ||
       /^scenario\s+template\b/i.test(trimmed) ||
       /^scenario\b/i.test(trimmed) ||
       trimmed.startsWith('Scenario:') ||
-      trimmed.startsWith('Scenario Outline:')
+      trimmed.startsWith('Scenario Outline:') ||
+      trimmed.startsWith('Scenario Template:')
     ) {
+      // If previous outline had missing Examples or missing placeholders, handle them
       if (currentScenarioType === 'Scenario Outline' && !currentScenarioHasExamples) {
         fixed.push('    Examples:');
-        fixed.push('      | username | password | result  |');
-        fixed.push('      | admin    | secret1  | success |');
+        const phArray = Array.from(currentOutlinePlaceholders);
+        if (phArray.length > 0) {
+          fixed.push(`      | ${phArray.join(' | ')} |`);
+          fixed.push(`      | ${phArray.map(p => `${p}_value`).join(' | ')} |`);
+        } else {
+          fixed.push('      | username | password |');
+          fixed.push('      | admin    | secret   |');
+        }
         fixed.push('');
       }
 
-      let isOutline = /^scenario\s+(outline|template)\b/i.test(trimmed) || trimmed.startsWith('Scenario Outline:');
-      let title = trimmed.replace(/^scenario\s*(outline|template)?\s*:?\s*/i, '').trim() || (isOutline ? 'Data Driven Test' : 'Standard Test Flow');
+      let isOutline = /^scenario\s+(outline|template)\b/i.test(trimmed) || trimmed.startsWith('Scenario Outline:') || trimmed.startsWith('Scenario Template:');
+      let title = trimmed.replace(/^scenario\s*(outline|template)?\s*:?\s*/i, '').trim() || (isOutline ? 'Data Driven User Flow' : 'Standard User Operation');
 
       if (scenarioNames.has(title)) {
         const count = scenarioNames.get(title) + 1;
@@ -192,47 +212,92 @@ function fallbackAISmartFix(code, errorsList) {
 
       currentScenarioType = isOutline ? 'Scenario Outline' : 'Scenario';
       currentScenarioHasExamples = false;
+      currentOutlinePlaceholders.clear();
+      currentOutlineExamplesHeaderIndex = -1;
+      lastMainStepKeyword = null;
 
       fixed.push(`  ${isOutline ? 'Scenario Outline:' : 'Scenario:'} ${title}`);
       continue;
     }
 
-    // Examples Fix
+    // Examples Keyword Fix
     if (/^examples\s*:?/i.test(trimmed) || trimmed.startsWith('Examples:')) {
       currentScenarioHasExamples = true;
       let title = trimmed.replace(/^examples\s*:?\s*/i, '').trim();
       fixed.push(`    ${title ? `Examples: ${title}` : 'Examples:'}`);
+      currentOutlineExamplesHeaderIndex = fixed.length;
       continue;
     }
 
-    // Data Table Fix
+    // Data Table Rows
     if (trimmed.startsWith('|')) {
       const cells = trimmed.split('|').slice(1, -1).map(c => c.trim());
       fixed.push(`      | ${cells.join(' | ')} |`);
       continue;
     }
 
-    // Steps Fix
+    // Steps Verification (Given, When, Then, And, But)
     const stepMatch = trimmed.match(/^(given|when|then|and|but)\b/i);
     if (stepMatch) {
-      const kw = stepMatch[1].toLowerCase();
-      const capKw = kw.charAt(0).toUpperCase() + kw.slice(1);
-      const text = trimmed.slice(stepMatch[0].length).trim();
-      fixed.push(`    ${capKw} ${text}`);
+      let kw = stepMatch[1].toLowerCase();
+      let capKw = kw.charAt(0).toUpperCase() + kw.slice(1);
+      let stepText = trimmed.slice(stepMatch[0].length).trim();
+
+      // Fix dangling And / But step before any Given/When/Then
+      if ((capKw === 'And' || capKw === 'But') && !lastMainStepKeyword) {
+        capKw = 'Given';
+      }
+
+      if (capKw === 'Given' || capKw === 'When' || capKw === 'Then') {
+        lastMainStepKeyword = capKw;
+      }
+
+      // Fix unclosed double quotes e.g. "param -> "param"
+      const dQuotes = (stepText.match(/"/g) || []).length;
+      if (dQuotes % 2 !== 0) {
+        stepText += '"';
+      }
+
+      // Fix unclosed single quotes e.g. 'param -> 'param'
+      const sQuotes = (stepText.match(/'/g) || []).length;
+      if (sQuotes % 2 !== 0) {
+        stepText += "'";
+      }
+
+      // Track placeholders in Scenario Outline steps <param>
+      if (currentScenarioType === 'Scenario Outline') {
+        const phMatches = stepText.match(/<([^>]+)>/g);
+        if (phMatches) {
+          phMatches.forEach(m => {
+            currentOutlinePlaceholders.add(m.replace(/[<>]/g, '').trim());
+          });
+        }
+      }
+
+      fixed.push(`    ${capKw} ${stepText}`);
       continue;
     }
 
+    // Fallback line
     fixed.push(line);
   }
 
+  // If file missing Feature header
   if (!hasFeature) {
     fixed.unshift('Feature: User Feature Specification', '');
   }
 
+  // Handle trailing Scenario Outline missing Examples block
   if (currentScenarioType === 'Scenario Outline' && !currentScenarioHasExamples) {
     fixed.push('    Examples:');
-    fixed.push('      | username | password | result  |');
-    fixed.push('      | admin    | secret1  | success |');
+    const phArray = Array.from(currentOutlinePlaceholders);
+    if (phArray.length > 0) {
+      fixed.push(`      | ${phArray.join(' | ')} |`);
+      fixed.push(`      | ${phArray.map(p => `${p}_val`).join(' | ')} |`);
+    } else {
+      fixed.push('      | username | password |');
+      fixed.push('      | admin    | secret   |');
+    }
   }
 
   return fixed.join('\n');

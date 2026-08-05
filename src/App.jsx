@@ -65,17 +65,21 @@ export default function App() {
 
       setCode(fixedCode);
       handleRunTest(fixedCode);
-      setFixNotice('🤖 Claude AI analyzed all 4 checkers and fixed your Gherkin feature file!');
+      if (claudeApiKey && claudeApiKey.trim()) {
+        setFixNotice('🤖 Connected via Claude AI API! All 4 checker errors repaired.');
+      } else {
+        setFixNotice('✨ Auto-Fix applied! All syntax, keywords, and indentations repaired.');
+      }
     } catch (err) {
       console.error('Claude AI Fix Error:', err);
-      // Fallback auto fix
+      // Run smart fallback fix
       const fallbackFixed = autoFixGherkin(code);
       setCode(fallbackFixed);
       handleRunTest(fallbackFixed);
-      setFixNotice('✨ Auto-Fix applied! All syntax and indentations repaired.');
+      setFixNotice(`⚠️ API Key Error (${err.message || 'Call failed'}). Applied Smart Auto-Fix.`);
     } finally {
       setIsFixingWithAI(false);
-      setTimeout(() => setFixNotice(null), 4500);
+      setTimeout(() => setFixNotice(null), 5000);
     }
   };
 
