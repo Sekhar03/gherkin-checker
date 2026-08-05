@@ -1,6 +1,6 @@
 import React, { useEffect } from 'react';
 import confetti from 'canvas-confetti';
-import { CheckCircle2, XCircle, AlertTriangle, ExternalLink, Lightbulb, Wrench, FileCode, Tag, Play, ShieldCheck, Bot, Loader2 } from 'lucide-react';
+import { CheckCircle2, XCircle, AlertTriangle, ExternalLink, Lightbulb, Wrench, FileCode, Tag, ShieldCheck, Bot, Loader2, Sparkles, ChevronRight } from 'lucide-react';
 
 export function AnalysisDashboard({ results, isTested, onRunTest, onHighlightLine, onAutoFix, onFixLine, isFixingWithAI }) {
   const { overallPass, totalErrors, totalWarnings, checkers } = results || {
@@ -31,12 +31,12 @@ export function AnalysisDashboard({ results, isTested, onRunTest, onHighlightLin
       <div className="dashboard-container">
         <div className="hero-banner banner-untested">
           <div className="banner-icon-box">
-            <ShieldCheck size={48} className="icon-ready" />
+            <ShieldCheck size={38} className="icon-ready" />
           </div>
 
           <div className="banner-content">
             <div className="banner-tag">READY FOR VALIDATION</div>
-            <h2 className="banner-title">Paste your Gherkin file & click "Test Gherkin"</h2>
+            <h2 className="banner-title">Paste Gherkin file & click "Test Gherkin"</h2>
             <p className="banner-desc">
               Your feature file will pass through all 4 checkers simultaneously (@cucumber/gherkin AST, gherkin-lint rules, Matriz88 consistency, and sistar lexer tokens).
             </p>
@@ -50,8 +50,8 @@ export function AnalysisDashboard({ results, isTested, onRunTest, onHighlightLin
               <div className="checker-card-header">
                 <div className="checker-info">
                   <span className="checker-name">{c.name}</span>
-                  <a href={c.repo} target="_blank" rel="noreferrer" className="repo-link">
-                    <ExternalLink size={13} />
+                  <a href={c.repo} target="_blank" rel="noreferrer" className="repo-link" title="View Repository">
+                    <ExternalLink size={12} />
                   </a>
                 </div>
                 <div className="checker-badge ready">
@@ -73,30 +73,30 @@ export function AnalysisDashboard({ results, isTested, onRunTest, onHighlightLin
       <div className={`hero-banner ${overallPass ? 'banner-pass' : 'banner-fail'}`}>
         <div className="banner-icon-box">
           {overallPass ? (
-            <CheckCircle2 size={48} className="icon-pass" />
+            <CheckCircle2 size={40} className="icon-pass" />
           ) : (
-            <XCircle size={48} className="icon-fail" />
+            <XCircle size={40} className="icon-fail" />
           )}
         </div>
 
         <div className="banner-content">
           <div className="banner-tag">
-            {overallPass ? 'ALL 4 CHECKERS PASSED' : 'CHECK FAILURES DETECTED'}
+            {overallPass ? 'ALL 4 CHECKERS PASSED' : 'VALIDATION ISSUES DETECTED'}
           </div>
           <h2 className="banner-title">
-            {overallPass ? '✅ Gherkin Passed All 4 Checkers!' : `❌ Gherkin Failed with ${totalErrors} Error${totalErrors === 1 ? '' : 's'}`}
+            {overallPass ? '✅ All 4 Checkers Passed Cleanly!' : `❌ ${totalErrors} Error${totalErrors === 1 ? '' : 's'} & ${totalWarnings} Warning${totalWarnings === 1 ? '' : 's'}`}
           </h2>
           <p className="banner-desc">
             {overallPass
               ? 'Your Gherkin feature file satisfies @cucumber/gherkin AST specs, gherkin-lint quality standards, Matriz88 step consistency, and sistar lexing structure.'
-              : `Detected ${totalErrors} error${totalErrors === 1 ? '' : 's'} and ${totalWarnings} warning${totalWarnings === 1 ? '' : 's'}. Click "Fix with Claude AI" to let AI read all checker errors and rewrite Gherkin.`}
+              : 'Review detailed breakdown below or click "Fix with AI" to automatically resolve syntax, keywords, and indentation.'}
           </p>
 
           {!overallPass && onAutoFix && (
             <div className="banner-action-row">
               <button onClick={onAutoFix} disabled={isFixingWithAI} className="btn-banner-autofix btn-claude-banner">
-                {isFixingWithAI ? <Loader2 size={16} className="spin-icon" /> : <Bot size={18} />}
-                <span>{isFixingWithAI ? 'Claude AI Analyzing & Fixing...' : 'Fix with Claude AI'}</span>
+                {isFixingWithAI ? <Loader2 size={15} className="spin-icon" /> : <Bot size={16} />}
+                <span>{isFixingWithAI ? 'Claude AI Repairing...' : 'Fix with Claude AI'}</span>
               </button>
             </div>
           )}
@@ -120,12 +120,12 @@ export function AnalysisDashboard({ results, isTested, onRunTest, onHighlightLin
                     className="repo-link"
                     title="View GitHub Repository"
                   >
-                    <ExternalLink size={13} />
+                    <ExternalLink size={12} />
                   </a>
                 </div>
 
                 <div className={`checker-badge ${isPass ? 'pass' : 'fail'}`}>
-                  {isPass ? <CheckCircle2 size={13} /> : <XCircle size={13} />}
+                  {isPass ? <CheckCircle2 size={12} /> : <XCircle size={12} />}
                   <span>{isPass ? 'PASS' : 'FAIL'}</span>
                 </div>
               </div>
@@ -144,10 +144,10 @@ export function AnalysisDashboard({ results, isTested, onRunTest, onHighlightLin
                 )}
               </div>
 
-              {/* Explicit Detailed Error List */}
+              {/* Detailed Error List */}
               {checker.errors.length > 0 && (
                 <div className="error-list">
-                  <h4 className="list-heading">Detailed Failures ({checker.errors.length}):</h4>
+                  <h4 className="list-heading">Failures ({checker.errors.length})</h4>
                   {checker.errors.map((err, idx) => (
                     <div key={idx} className="error-item" onClick={() => onHighlightLine?.(err.line)}>
                       <div className="error-item-top">
@@ -172,7 +172,7 @@ export function AnalysisDashboard({ results, isTested, onRunTest, onHighlightLin
                             }}
                             title={`Fix issue on Line ${err.line}`}
                           >
-                            <Wrench size={11} /> Fix Line
+                            <Wrench size={11} /> Quick Fix
                           </button>
                         )}
                       </div>
@@ -180,7 +180,7 @@ export function AnalysisDashboard({ results, isTested, onRunTest, onHighlightLin
                       {err.text !== undefined && (
                         <div className="failing-text-box">
                           <div className="snippet-label">
-                            <FileCode size={11} /> Failing Line Snippet:
+                            <FileCode size={11} /> Snippet:
                           </div>
                           <code>{err.text || '(empty line)'}</code>
                         </div>
@@ -188,7 +188,7 @@ export function AnalysisDashboard({ results, isTested, onRunTest, onHighlightLin
 
                       <div className="error-reason">
                         <span className="reason-label">
-                          <Lightbulb size={12} className="icon-reason" /> Clear Failure Reason:
+                          <Lightbulb size={12} className="icon-reason" /> Failure Reason:
                         </span>
                         <div className="reason-text">{err.reason}</div>
                       </div>
@@ -196,7 +196,7 @@ export function AnalysisDashboard({ results, isTested, onRunTest, onHighlightLin
                       {err.fix && (
                         <div className="error-fix-box">
                           <span className="fix-label">
-                            <Wrench size={11} /> Suggested Fix:
+                            <Sparkles size={11} /> Suggested Fix:
                           </span>
                           <span className="fix-text">{err.fix}</span>
                         </div>
@@ -209,7 +209,7 @@ export function AnalysisDashboard({ results, isTested, onRunTest, onHighlightLin
               {/* Warning List */}
               {checker.warnings.length > 0 && (
                 <div className="warning-list">
-                  <h4 className="list-heading warning">Quality Warnings ({checker.warnings.length}):</h4>
+                  <h4 className="list-heading warning">Quality Warnings ({checker.warnings.length})</h4>
                   {checker.warnings.map((warn, idx) => (
                     <div key={idx} className="warning-item" onClick={() => onHighlightLine?.(warn.line)}>
                       <div className="error-item-top">
@@ -226,7 +226,7 @@ export function AnalysisDashboard({ results, isTested, onRunTest, onHighlightLin
                             }}
                             title={`Fix warning on Line ${warn.line}`}
                           >
-                            <Wrench size={11} /> Fix Line
+                            <Wrench size={11} /> Quick Fix
                           </button>
                         )}
                       </div>
@@ -254,8 +254,8 @@ export function AnalysisDashboard({ results, isTested, onRunTest, onHighlightLin
               {/* Pass Message */}
               {isPass && (
                 <div className="pass-message">
-                  <CheckCircle2 size={16} />
-                  <span>No syntax, structural, or lexical errors reported by {checker.name}.</span>
+                  <CheckCircle2 size={15} />
+                  <span>Passes all syntax & lexical checks for {checker.name}.</span>
                 </div>
               )}
             </div>
@@ -265,3 +265,4 @@ export function AnalysisDashboard({ results, isTested, onRunTest, onHighlightLin
     </div>
   );
 }
+

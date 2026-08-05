@@ -1,5 +1,5 @@
 import React, { useRef } from 'react';
-import { Upload, Download, Copy, Trash2, FileText, AlertCircle, AlertTriangle, Play, Zap, Bot, Loader2 } from 'lucide-react';
+import { Upload, Download, Copy, Trash2, FileText, AlertCircle, AlertTriangle, Play, Bot, Loader2 } from 'lucide-react';
 
 export function GherkinEditor({ code, onChange, onRunTest, onAutoFix, isFixingWithAI, errorsByLine = {}, isTested, hasIssues }) {
   const fileInputRef = useRef(null);
@@ -29,8 +29,8 @@ export function GherkinEditor({ code, onChange, onRunTest, onAutoFix, isFixingWi
   };
 
   const handleCopy = () => {
+    if (!code) return;
     navigator.clipboard.writeText(code);
-    alert('Gherkin content copied to clipboard!');
   };
 
   const handleClear = () => {
@@ -41,35 +41,41 @@ export function GherkinEditor({ code, onChange, onRunTest, onAutoFix, isFixingWi
     <div className="editor-card">
       <div className="editor-toolbar">
         <div className="editor-title">
-          <FileText size={16} />
-          <span>Gherkin Feature Editor</span>
+          <div className="title-icon">
+            <FileText size={16} />
+          </div>
+          <span className="title-text">Feature Editor</span>
           <span className="file-tag">.feature</span>
         </div>
 
         <div className="editor-actions">
-          {/* Claude AI Auto-Fix Button */}
-          <button
-            onClick={onAutoFix}
-            className={`btn-action ${isTested && hasIssues ? 'btn-autofix-active btn-claude-editor' : ''}`}
-            disabled={!code.trim() || isFixingWithAI}
-            title="Claude AI reads all 4 checker errors and automatically fixes Gherkin code"
-          >
-            {isFixingWithAI ? <Loader2 size={14} className="spin-icon" /> : <Bot size={14} />}
-            <span>{isFixingWithAI ? 'Fixing with Claude...' : 'Claude AI Fix'}</span>
-          </button>
-
-          {/* Prominent Test / Analyze Button */}
+          {/* Test / Analyze Button */}
           <button
             onClick={onRunTest}
             className="btn-action btn-test-primary"
             disabled={!code.trim()}
-            title="Click to run analysis through all 4 checkers"
+            title="Run analysis through all 4 checkers"
           >
-            <Play size={14} fill="currentColor" /> Test Gherkin
+            <Play size={13} fill="currentColor" />
+            <span>Test Gherkin</span>
           </button>
 
-          <button onClick={() => fileInputRef.current?.click()} className="btn-action">
-            <Upload size={14} /> Upload
+          {/* AI Auto-Fix Button */}
+          <button
+            onClick={onAutoFix}
+            className={`btn-action ${isTested && hasIssues ? 'btn-autofix-active btn-claude-editor' : 'btn-ai-ghost'}`}
+            disabled={!code.trim() || isFixingWithAI}
+            title="Claude AI fixes syntax and checker errors"
+          >
+            {isFixingWithAI ? <Loader2 size={13} className="spin-icon" /> : <Bot size={13} />}
+            <span>{isFixingWithAI ? 'Fixing...' : 'AI Fix'}</span>
+          </button>
+
+          <div className="action-divider"></div>
+
+          <button onClick={() => fileInputRef.current?.click()} className="btn-action btn-icon-only" title="Upload .feature file">
+            <Upload size={14} />
+            <span className="btn-label-desktop">Upload</span>
           </button>
           <input
             type="file"
@@ -79,16 +85,19 @@ export function GherkinEditor({ code, onChange, onRunTest, onAutoFix, isFixingWi
             style={{ display: 'none' }}
           />
 
-          <button onClick={handleDownload} className="btn-action" disabled={!code.trim()}>
-            <Download size={14} /> Export
+          <button onClick={handleDownload} className="btn-action btn-icon-only" disabled={!code.trim()} title="Export file">
+            <Download size={14} />
+            <span className="btn-label-desktop">Export</span>
           </button>
 
-          <button onClick={handleCopy} className="btn-action" disabled={!code.trim()}>
-            <Copy size={14} /> Copy
+          <button onClick={handleCopy} className="btn-action btn-icon-only" disabled={!code.trim()} title="Copy to Clipboard">
+            <Copy size={14} />
+            <span className="btn-label-desktop">Copy</span>
           </button>
 
-          <button onClick={handleClear} className="btn-action btn-danger" disabled={!code.trim()}>
-            <Trash2 size={14} /> Clear
+          <button onClick={handleClear} className="btn-action btn-danger btn-icon-only" disabled={!code.trim()} title="Clear Editor">
+            <Trash2 size={14} />
+            <span className="btn-label-desktop">Clear</span>
           </button>
         </div>
       </div>
@@ -122,31 +131,29 @@ export function GherkinEditor({ code, onChange, onRunTest, onAutoFix, isFixingWi
           className="code-textarea"
           value={code}
           onChange={(e) => onChange(e.target.value)}
-          placeholder="Paste your Gherkin feature file here...&#10;&#10;Example:&#10;Feature: User Authentication System&#10;  Scenario: Successful login with valid credentials&#10;    Given the user is on the login page&#10;    When the user enters valid username and password&#10;    Then the user should be redirected to dashboard&#10;&#10;👉 Then click the 'TEST GHERKIN' button to analyze!"
+          placeholder={`Feature: User Authentication System\n\n  Scenario: Successful login with valid credentials\n    Given the user is on the login page\n    When the user enters valid username and password\n    Then the user should be redirected to dashboard\n\n# Paste or type Gherkin feature file above, then click 'Test Gherkin'`}
           spellCheck="false"
         />
       </div>
 
       <div className="editor-footer">
-        <span>Lines: {lines.length} | Characters: {code.length}</span>
-
-        {/* Big Test Button at Bottom if code exists */}
-        <div className="footer-test-bar">
-          <button
-            onClick={onRunTest}
-            className="btn-run-test-big"
-            disabled={!code.trim()}
-          >
-            <Zap size={14} /> RUN ALL 4 CHECKERS
-          </button>
+        <div className="footer-meta">
+          <span>Lines: <strong>{lines.length}</strong></span>
+          <span className="dot-divider">•</span>
+          <span>Chars: <strong>{code.length}</strong></span>
         </div>
 
-        {isTested && Object.keys(errorsByLine).length > 0 && (
+        {isTested && Object.keys(errorsByLine).length > 0 ? (
           <span className="error-highlight-notice">
-            <AlertCircle size={13} /> {Object.keys(errorsByLine).length} lines flagged with issues
+            <AlertCircle size={13} /> {Object.keys(errorsByLine).length} line{Object.keys(errorsByLine).length === 1 ? '' : 's'} flagged with issues
+          </span>
+        ) : (
+          <span className="footer-status-text">
+            {isTested ? '✓ Syntax structure validated' : 'Ready for input'}
           </span>
         )}
       </div>
     </div>
   );
 }
+
