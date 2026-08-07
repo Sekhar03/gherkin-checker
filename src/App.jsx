@@ -4,6 +4,7 @@ import { GherkinEditor } from './components/GherkinEditor';
 import { AnalysisDashboard } from './components/AnalysisDashboard';
 import { ReportExporter } from './components/ReportExporter';
 import { AISettingsModal } from './components/AISettingsModal';
+import { FlowchartVisualizer } from './components/FlowchartVisualizer';
 import { Footer } from './components/Footer';
 import { SAMPLES } from './utils/samples';
 import { runAllCheckers } from './validators/masterRunner';
@@ -24,6 +25,9 @@ export default function App() {
   const [isTested, setIsTested] = useState(false);
   const [analysisResults, setAnalysisResults] = useState(null);
   const [fixNotice, setFixNotice] = useState(null);
+
+  // Flowchart Modal state
+  const [isFlowchartOpen, setIsFlowchartOpen] = useState(false);
 
   // Claude AI state
   const [isFixingWithAI, setIsFixingWithAI] = useState(false);
@@ -161,6 +165,13 @@ export default function App() {
     setIsTested(false); // Reset tested state so user clicks Test Gherkin button
   };
 
+  const handleApplyFlowchartCode = (newCode) => {
+    setCode(newCode);
+    handleRunTest(newCode);
+    setFixNotice('🗺️ Loaded visual flowchart scenario code into editor & tested!');
+    setTimeout(() => setFixNotice(null), 4000);
+  };
+
   return (
     <div className="app-wrapper">
       {/* Toast Fix Notice */}
@@ -184,6 +195,7 @@ export default function App() {
         onAutoFix={handleInternalAutoFix}
         onFormat={handleFormatGherkin}
         onOpenAISettings={() => setIsAISettingsOpen(true)}
+        onOpenFlowchart={() => setIsFlowchartOpen(true)}
         isFixingWithAI={isFixingWithAI}
         hasIssues={(analysisResults?.totalErrors || 0) > 0 || (analysisResults?.totalWarnings || 0) > 0}
         hasCode={!!code && !!code.trim()}
@@ -221,6 +233,14 @@ export default function App() {
           onFormat={handleFormatGherkin}
         />
       )}
+
+      {/* Flowchart & Builder Modal */}
+      <FlowchartVisualizer
+        isOpen={isFlowchartOpen}
+        onClose={() => setIsFlowchartOpen(false)}
+        currentGherkinCode={code}
+        onApplyGherkinCode={handleApplyFlowchartCode}
+      />
 
       {/* AI Settings Modal */}
       <AISettingsModal

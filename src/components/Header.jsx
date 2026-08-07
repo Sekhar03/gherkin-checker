@@ -1,8 +1,8 @@
 import React from 'react';
-import { ShieldCheck, Github, Sparkles, CheckCircle2, AlertTriangle, Play, Sun, Moon, Settings, Loader2, Code2, AlertCircle, AlignLeft, Linkedin } from 'lucide-react';
+import { ShieldCheck, Github, Sparkles, CheckCircle2, AlertTriangle, Play, Sun, Moon, Settings, Loader2, Code2, AlertCircle, AlignLeft, Linkedin, ArrowRightLeft } from 'lucide-react';
 import { SAMPLES } from '../utils/samples';
 
-export function Header({ theme, onToggleTheme, currentSampleId, onSelectSample, totalErrors, totalWarnings, overallPass, executionTimeMs, isTested, onAutoFix, onFormat, onOpenAISettings, isFixingWithAI, hasIssues, hasCode }) {
+export function Header({ theme, onToggleTheme, currentSampleId, onSelectSample, totalErrors, totalWarnings, overallPass, executionTimeMs, isTested, onAutoFix, onFormat, onOpenAISettings, onOpenFlowchart, isFixingWithAI, hasIssues, hasCode }) {
   const repos = [
     { name: 'gherkin-lint', url: 'https://github.com/gherkin-lint/gherkin-lint', tag: 'Linter Rules' },
     { name: '@cucumber/gherkin', url: 'https://github.com/cucumber/gherkin-javascript', tag: 'Cucumber AST Parser' },
@@ -92,6 +92,15 @@ export function Header({ theme, onToggleTheme, currentSampleId, onSelectSample, 
           </div>
 
           <div className="header-actions-group">
+            <button
+              onClick={onOpenFlowchart}
+              className="theme-toggle-btn btn-flowchart-header"
+              title="Open Bidirectional Visual Flowchart & Vice-Versa Scenario Builder"
+            >
+              <ArrowRightLeft size={14} className="text-cyan" />
+              <span>Flowchart & Builder</span>
+            </button>
+
             {isTested && hasIssues && (
               <button
                 onClick={onAutoFix}
