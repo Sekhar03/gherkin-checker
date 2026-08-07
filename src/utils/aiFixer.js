@@ -21,28 +21,60 @@ export async function fixGherkinWithClaudeAI({ code, results, apiKey, apiProvide
     });
   }
 
-  const prompt = `You are a world-class Cucumber & Gherkin QA Automation Engineer.
-I have a Gherkin .feature file that failed validation across 4 checkers (@cucumber/gherkin AST, gherkin-lint rules, Matriz88 consistency, and sistar lexer tokens).
+  const prompt = `You are an elite Cucumber & Gherkin QA Principal Automation Engineer trained on official Cucumber specifications, gherkin-lint rulesets, and BDD domain-driven design principles.
 
---- ORIGINAL GHERKIN CODE ---
+--- OFFICIAL BDD REFACTORING & TRAINING RULES ---
+1. OFFICIAL SPECIFICATION: Feature, Background, Scenario, Scenario Outline, Examples, Given, When, Then, And, But, Rule.
+2. SYNTAX REPAIR:
+   - Always capitalize keywords properly (Feature:, Scenario:, Given, When, Then, And, But).
+   - Indent steps with 4 spaces under Scenarios/Background. Indent Scenarios with 2 spaces under Feature.
+   - Close all unclosed quotes (") and single quotes (').
+3. WARNING & HYGIENE ELIMINATION:
+   - Empty Background: Add a prerequisite Given step (e.g. "Given the system is online and ready").
+   - Scenario Outline missing Examples: Create an Examples: table with columns matching all <placeholder> variables.
+   - Duplicate Tags: If @tag is on Feature, strip it from Scenario.
+   - Repeated Keywords: Convert repeated Given/Given or When/When to 'And'.
+   - Empty Lines: Collapse multiple consecutive blank lines down to a single blank line.
+4. DECLARATIVE DOMAIN REFACTORING:
+   - Refactor first-person phrasing ("I click", "I type") into declarative steps ("When submitting login credentials").
+
+--- FEW-SHOT TRAINING EXAMPLES ---
+
+EXAMPLE 1 (Fixing Empty Background, Missing Examples, & Bad Indentation):
+[INPUT CODE]:
+feature: login
+background:
+scenario outline: test user login <username>
+given I click login button
+when I type "<username>"
+then I see dashboard
+
+[EXPECTED FIXED CODE]:
+Feature: User Login System
+
+  Background:
+    Given the authentication service is operational
+
+  Scenario Outline: Test user login
+    Given navigating to the login page
+    When submitting username "<username>"
+    Then the user should see the dashboard
+
+    Examples:
+      | username |
+      | user_admin |
+
+--- CURRENT USER GHERKIN CODE TO FIX ---
 ${code}
 
---- VALIDATION ERRORS DETECTED ---
+--- VALIDATION ERRORS REPORTED ---
 ${errorsList.length > 0 ? errorsList.join('\n') : 'No hard errors reported.'}
 
---- QUALITY WARNINGS DETECTED ---
+--- QUALITY WARNINGS REPORTED ---
 ${warningsList.length > 0 ? warningsList.join('\n') : 'No warnings reported.'}
 
 CRITICAL TASK:
-1. You MUST resolve 100% of ALL Hard ERRORS AND ALL Quality WARNINGS reported across all 4 checkers.
-2. Fix all syntax errors, keyword capitalization (Given, When, Then, Scenario, Feature), line indentations, step consistency, and unclosed quotes.
-3. Fix all warnings:
-   - Empty Backgrounds: Add a valid Given step under Background if empty.
-   - Missing Example Variables: Add all missing <variable> columns into the Examples table.
-   - Multiple Empty Lines: Remove consecutive empty lines down to a single blank line.
-   - Duplicate Tags: Remove tags on scenarios if they already exist on the Feature level.
-   - Repeated Keywords: Convert repeated Given/Given or When/When to 'And'.
-4. Output ONLY the fixed Gherkin code inside a markdown code block tagged with gherkin, e.g. \`\`\`gherkin ... \`\`\`. Do not include any conversational preamble or explanation.`;
+Output ONLY the final, 100% error-free and warning-free fixed Gherkin code inside a markdown code block tagged with gherkin, e.g. \`\`\`gherkin ... \`\`\`. Do NOT include preamble, markdown headers, or explanations.`;
 
   // Filter placeholder / invalid template keys
   const cleanKey = apiKey ? apiKey.trim() : '';
