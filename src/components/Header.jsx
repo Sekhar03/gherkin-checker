@@ -1,8 +1,8 @@
 import React from 'react';
-import { ShieldCheck, Github, Sparkles, CheckCircle2, AlertTriangle, Play, Sun, Moon, Settings, Loader2, Code2, AlertCircle, AlignLeft, Linkedin, ArrowRightLeft } from 'lucide-react';
+import { ShieldCheck, Github, Sparkles, CheckCircle2, AlertTriangle, Play, Sun, Moon, Settings, Loader2, Code2, AlertCircle, AlignLeft, Linkedin, ArrowRightLeft, Gauge } from 'lucide-react';
 import { SAMPLES } from '../utils/samples';
 
-export function Header({ theme, onToggleTheme, currentSampleId, onSelectSample, totalErrors, totalWarnings, overallPass, executionTimeMs, isTested, onAutoFix, onFormat, onOpenAISettings, onOpenFlowchart, isFixingWithAI, hasIssues, hasCode }) {
+export function Header({ theme, onToggleTheme, currentSampleId, onSelectSample, totalErrors, totalWarnings, overallPass, executionTimeMs, isTested, onAutoFix, onFormat, onOpenAISettings, onOpenFlowchart, onOpenLoadTest, isFixingWithAI, hasIssues, hasCode }) {
   const repos = [
     { name: 'gherkin-lint', url: 'https://github.com/gherkin-lint/gherkin-lint', tag: 'Linter Rules' },
     { name: '@cucumber/gherkin', url: 'https://github.com/cucumber/gherkin-javascript', tag: 'Cucumber AST Parser' },
@@ -99,6 +99,15 @@ export function Header({ theme, onToggleTheme, currentSampleId, onSelectSample, 
             >
               <ArrowRightLeft size={14} className="text-cyan" />
               <span>Flowchart & Builder</span>
+            </button>
+
+            <button
+              onClick={onOpenLoadTest}
+              className="theme-toggle-btn btn-loadtest-header"
+              title="Generate Performance & Load Test Scripts (k6, JMeter, Gatling)"
+            >
+              <Gauge size={14} className="text-amber" />
+              <span>Load Test Generator</span>
             </button>
 
             {isTested && hasIssues && (

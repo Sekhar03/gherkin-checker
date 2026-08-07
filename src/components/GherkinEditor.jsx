@@ -1,11 +1,15 @@
-import React, { useRef } from 'react';
-import { Upload, Download, Copy, Trash2, FileText, Play, Loader2, Sparkles, AlignLeft, AlertCircle, AlertTriangle } from 'lucide-react';
+import React, { useRef, useState } from 'react';
+import { Upload, Download, Copy, Trash2, FileText, Play, Loader2, Sparkles, AlignLeft, AlertCircle, AlertTriangle, Zap } from 'lucide-react';
 import { formatGherkinCode } from '../utils/autoFixer';
+import { getStepSuggestions } from '../utils/stepDictionary';
 
 export function GherkinEditor({ code, onChange, onRunTest, onAutoFix, onFormat, isFixingWithAI, errorsByLine = {}, isTested, hasIssues }) {
   const fileInputRef = useRef(null);
   const textareaRef = useRef(null);
   const gutterRef = useRef(null);
+
+  const [suggestions, setSuggestions] = useState([]);
+  const [activeLineIdx, setActiveLineIdx] = useState(-1);
 
   const lines = code ? code.split('\n') : [''];
 
@@ -13,6 +17,36 @@ export function GherkinEditor({ code, onChange, onRunTest, onAutoFix, onFormat, 
     if (textareaRef.current && gutterRef.current) {
       gutterRef.current.scrollTop = textareaRef.current.scrollTop;
     }
+  };
+
+  const handleCodeTextChange = (e) => {
+    const val = e.target.value;
+    onChange(val);
+
+    // Compute active line text for intellisense
+    const cursorPos = e.target.selectionStart;
+    const linesUpToCursor = val.substring(0, cursorPos).split('\n');
+    const currentLineIdx = linesUpToCursor.length - 1;
+    const currentLineText = linesUpToCursor[currentLineIdx] || '';
+
+    setActiveLineIdx(currentLineIdx);
+    const stepSugg = getStepSuggestions(val, currentLineText);
+    setSuggestions(stepSugg);
+  };
+
+  const applySuggestion = (sugg) => {
+    if (!textareaRef.current || activeLineIdx < 0) return;
+
+    const allLines = code.split('\n');
+    const activeLine = allLines[activeLineIdx] || '';
+    const kwMatch = activeLine.trimStart().match(/^(Given|When|Then|And|But)\s*/i);
+    const indent = activeLine.match(/^\s*/)?.[0] || '    ';
+    const kw = kwMatch ? kwMatch[1] : sugg.keyword;
+
+    allLines[activeLineIdx] = `${indent}${kw} ${sugg.text}`;
+    const newCode = allLines.join('\n');
+    onChange(newCode);
+    setSuggestions([]);
   };
 
   const handleFileUpload = (e) => {
@@ -29,7 +63,6 @@ export function GherkinEditor({ code, onChange, onRunTest, onAutoFix, onFormat, 
   const handleDownload = () => {
     if (!code || !code.trim()) return;
 
-    // Auto-format Gherkin code when export/download is initiated
     const formatted = onFormat ? onFormat() : formatGherkinCode(code);
     const contentToDownload = formatted || code;
 
@@ -49,6 +82,7 @@ export function GherkinEditor({ code, onChange, onRunTest, onAutoFix, onFormat, 
 
   const handleClear = () => {
     onChange('');
+    setSuggestions([]);
   };
 
   return (
@@ -127,7 +161,7 @@ export function GherkinEditor({ code, onChange, onRunTest, onAutoFix, onFormat, 
         </div>
       </div>
 
-      <div className="editor-workspace">
+      <div className="editor-workspace position-relative">
         <div className="line-numbers" ref={gutterRef}>
           {lines.map((_, i) => {
             const lineNum = i + 1;
@@ -152,14 +186,37 @@ export function GherkinEditor({ code, onChange, onRunTest, onAutoFix, onFormat, 
         <textarea
           ref={textareaRef}
           value={code}
-          onChange={(e) => onChange(e.target.value)}
+          onChange={handleCodeTextChange}
           onScroll={handleScroll}
           wrap="off"
           placeholder={`Feature: User Authentication System\n\n  Scenario: Successful Login with valid credentials\n    Given the user is on the login page\n    When the user submits valid credentials\n    Then the system redirects to dashboard`}
           className="code-textarea gherkin-textarea"
           spellCheck="false"
         />
+
+        {/* Smart Intellisense Autocomplete Popup */}
+        {suggestions.length > 0 && (
+          <div className="intellisense-popup">
+            <div className="intellisense-header">
+              <Zap size={12} className="text-amber" />
+              <span>Step Autocomplete (Intellisense)</span>
+            </div>
+            <div className="intellisense-list">
+              {suggestions.map((sugg, idx) => (
+                <div
+                  key={idx}
+                  onClick={() => applySuggestion(sugg)}
+                  className="intellisense-item"
+                >
+                  <span className={`kw-badge kw-${sugg.keyword.toLowerCase()}`}>{sugg.keyword}</span>
+                  <span className="sugg-text">{sugg.text}</span>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
       </div>
     </div>
   );
 }
+
