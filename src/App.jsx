@@ -172,6 +172,16 @@ export default function App() {
     setTimeout(() => setFixNotice(null), 4000);
   };
 
+  const [highlightedLine, setHighlightedLine] = useState(null);
+
+  const handleHighlightLine = (lineNum) => {
+    setHighlightedLine(lineNum);
+    // Auto reset highlight pulse after 4 seconds
+    setTimeout(() => {
+      setHighlightedLine(null);
+    }, 4000);
+  };
+
   return (
     <div className="app-wrapper">
       {/* Toast Fix Notice */}
@@ -211,6 +221,7 @@ export default function App() {
           onFormat={handleFormatGherkin}
           isFixingWithAI={isFixingWithAI}
           errorsByLine={analysisResults?.errorsByLine || {}}
+          highlightedLine={highlightedLine}
           isTested={isTested}
           hasIssues={(analysisResults?.totalErrors || 0) > 0 || (analysisResults?.totalWarnings || 0) > 0}
         />
@@ -221,6 +232,7 @@ export default function App() {
           onRunTest={() => handleRunTest(code)}
           onAutoFix={handleInternalAutoFix}
           onFixLine={handleFixSingleLine}
+          onHighlightLine={handleHighlightLine}
           isFixingWithAI={isFixingWithAI}
         />
       </main>

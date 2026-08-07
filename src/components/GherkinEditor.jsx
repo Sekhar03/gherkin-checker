@@ -1,9 +1,9 @@
-import React, { useRef, useState } from 'react';
+import React, { useRef, useState, useEffect } from 'react';
 import { Upload, Download, Copy, Trash2, FileText, Play, Loader2, Sparkles, AlignLeft, AlertCircle, AlertTriangle, Zap } from 'lucide-react';
 import { formatGherkinCode } from '../utils/autoFixer';
 import { getStepSuggestions } from '../utils/stepDictionary';
 
-export function GherkinEditor({ code, onChange, onRunTest, onAutoFix, onFormat, isFixingWithAI, errorsByLine = {}, isTested, hasIssues }) {
+export function GherkinEditor({ code, onChange, onRunTest, onAutoFix, onFormat, isFixingWithAI, errorsByLine = {}, highlightedLine = null, isTested, hasIssues }) {
   const fileInputRef = useRef(null);
   const textareaRef = useRef(null);
   const gutterRef = useRef(null);
@@ -12,6 +12,33 @@ export function GherkinEditor({ code, onChange, onRunTest, onAutoFix, onFormat, 
   const [activeLineIdx, setActiveLineIdx] = useState(-1);
 
   const lines = code ? code.split('\n') : [''];
+
+  // Handle scrolling to and highlighting a clicked error/warning line from dashboard
+  useEffect(() => {
+    if (highlightedLine && highlightedLine > 0 && textareaRef.current) {
+      const allLines = code ? code.split('\n') : [];
+      if (highlightedLine <= allLines.length) {
+        let charOffset = 0;
+        for (let i = 0; i < highlightedLine - 1; i++) {
+          charOffset += allLines[i].length + 1;
+        }
+
+        // Scroll editor to target line
+        const lineRatio = (highlightedLine - 1) / Math.max(1, allLines.length);
+        const targetScrollTop = lineRatio * textareaRef.current.scrollHeight;
+        textareaRef.current.scrollTop = Math.max(0, targetScrollTop - 40);
+
+        if (gutterRef.current) {
+          gutterRef.current.scrollTop = textareaRef.current.scrollTop;
+        }
+
+        // Highlight line range inside textarea
+        const targetLineLen = allLines[highlightedLine - 1].length;
+        textareaRef.current.focus();
+        textareaRef.current.setSelectionRange(charOffset, charOffset + targetLineLen);
+      }
+    }
+  }, [highlightedLine, code]);
 
   const handleScroll = () => {
     if (textareaRef.current && gutterRef.current) {
@@ -168,11 +195,12 @@ export function GherkinEditor({ code, onChange, onRunTest, onAutoFix, onFormat, 
             const lineIssues = errorsByLine[lineNum] || [];
             const hasError = lineIssues.some(iss => !iss.isWarning);
             const hasWarning = !hasError && lineIssues.some(iss => iss.isWarning);
+            const isTargeted = highlightedLine === lineNum;
 
             return (
               <div
                 key={lineNum}
-                className={`line-num-item ${hasError ? 'has-error' : ''} ${hasWarning ? 'has-warning' : ''}`}
+                className={`line-num-item ${hasError ? 'has-error' : ''} ${hasWarning ? 'has-warning' : ''} ${isTargeted ? 'highlighted-target' : ''}`}
                 title={lineIssues.map(iss => iss.reason).join('\n')}
               >
                 <span>{lineNum}</span>
