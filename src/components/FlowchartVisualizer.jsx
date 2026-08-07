@@ -110,7 +110,13 @@ export function FlowchartVisualizer({ isOpen, onClose, currentGherkinCode, onApp
     setGeneratedGherkin(code);
   }, [builderState]);
 
-  if (!isOpen) return null;
+  // Auto-convert pasted Mermaid code whenever it changes
+  useEffect(() => {
+    if (pastedMermaid && pastedMermaid.trim()) {
+      const res = convertMermaidToGherkin(pastedMermaid);
+      setConvertedGherkinFromPaste(res);
+    }
+  }, [pastedMermaid]);
 
   const handleCopyMermaid = () => {
     navigator.clipboard.writeText(mermaidCode);
@@ -216,20 +222,14 @@ export function FlowchartVisualizer({ isOpen, onClose, currentGherkinCode, onApp
     }
   };
 
-  // Auto-convert pasted Mermaid code whenever it changes
-  useEffect(() => {
-    if (pastedMermaid && pastedMermaid.trim()) {
-      const res = convertMermaidToGherkin(pastedMermaid);
-      setConvertedGherkinFromPaste(res);
-    }
-  }, [pastedMermaid]);
-
   const handleConvertCurrentDiagramToGherkin = () => {
     const res = convertMermaidToGherkin(mermaidCode);
     setPastedMermaid(mermaidCode);
     setConvertedGherkinFromPaste(res);
     setActiveTab('pasteMermaid');
   };
+
+  if (!isOpen) return null;
 
   return (
     <div className="modal-backdrop">

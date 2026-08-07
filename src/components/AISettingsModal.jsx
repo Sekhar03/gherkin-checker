@@ -1,10 +1,17 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Bot, Key, Sparkles, X, Check, ExternalLink, Cpu } from 'lucide-react';
 
 export function AISettingsModal({ isOpen, onClose, apiKey, onSaveApiKey, apiProvider, onSaveProvider }) {
   const [tempKey, setTempKey] = useState(apiKey || '');
   const [provider, setProvider] = useState(apiProvider || 'anthropic');
   const [savedSuccess, setSavedSuccess] = useState(false);
+
+  useEffect(() => {
+    if (isOpen) {
+      setTempKey(apiKey || '');
+      setProvider(apiProvider || 'anthropic');
+    }
+  }, [isOpen, apiKey, apiProvider]);
 
   if (!isOpen) return null;
 
