@@ -1,5 +1,5 @@
 import React from 'react';
-import { ShieldCheck, Github, Sparkles, CheckCircle2, AlertTriangle, Play, Sun, Moon, Settings, Loader2, Code2, AlertCircle, AlignLeft } from 'lucide-react';
+import { ShieldCheck, Github, Sparkles, CheckCircle2, AlertTriangle, Play, Sun, Moon, Settings, Loader2, Code2, AlertCircle, AlignLeft, Linkedin } from 'lucide-react';
 import { SAMPLES } from '../utils/samples';
 
 export function Header({ theme, onToggleTheme, currentSampleId, onSelectSample, totalErrors, totalWarnings, overallPass, executionTimeMs, isTested, onAutoFix, onFormat, onOpenAISettings, isFixingWithAI, hasIssues, hasCode }) {
@@ -43,7 +43,20 @@ export function Header({ theme, onToggleTheme, currentSampleId, onSelectSample, 
               <span className="version-badge">4-in-1 Suite</span>
             </div>
             <p className="brand-subtitle">
-              Multi-Engine Gherkin <code className="code-tag">.feature</code> File Analyzer running 4 Checkers Simultaneously
+              Multi-Engine Gherkin <code className="code-tag">.feature</code> File Analyzer
+              <span className="header-dev-credit">
+                • Developed by{' '}
+                <a
+                  href="https://www.linkedin.com/in/sekhar-parida/"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="header-dev-link"
+                  title="Connect with Sekhar Parida on LinkedIn"
+                >
+                  <Linkedin size={12} />
+                  <span>Sekhar Parida</span>
+                </a>
+              </span>
             </p>
           </div>
         </div>

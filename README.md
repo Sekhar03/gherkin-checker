@@ -81,3 +81,10 @@ Open `http://127.0.0.1:5173/` in your browser.
 1. Go to **[vercel.com/new](https://vercel.com/new)**.
 2. Select repository **`Sekhar03/gherkin-checker`**.
 3. Click **Deploy**. Vercel will automatically build and publish your app!
+
+---
+
+## 👨‍💻 Developer
+**Sekhar Parida**  
+🔗 LinkedIn: [https://www.linkedin.com/in/sekhar-parida/](https://www.linkedin.com/in/sekhar-parida/)
+

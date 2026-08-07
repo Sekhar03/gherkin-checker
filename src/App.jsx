@@ -4,6 +4,7 @@ import { GherkinEditor } from './components/GherkinEditor';
 import { AnalysisDashboard } from './components/AnalysisDashboard';
 import { ReportExporter } from './components/ReportExporter';
 import { AISettingsModal } from './components/AISettingsModal';
+import { Footer } from './components/Footer';
 import { SAMPLES } from './utils/samples';
 import { runAllCheckers } from './validators/masterRunner';
 import { autoFixGherkin, fixSingleLine, formatGherkinCode } from './utils/autoFixer';
@@ -230,6 +231,9 @@ export default function App() {
         apiProvider={claudeProvider}
         onSaveProvider={handleSaveProvider}
       />
+
+      {/* Global Application Footer */}
+      <Footer />
     </div>
   );
 }
