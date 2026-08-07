@@ -5,7 +5,6 @@ import { AnalysisDashboard } from './components/AnalysisDashboard';
 import { ReportExporter } from './components/ReportExporter';
 import { AISettingsModal } from './components/AISettingsModal';
 import { FlowchartVisualizer } from './components/FlowchartVisualizer';
-import { LoadTestExporterModal } from './components/LoadTestExporterModal';
 import { Footer } from './components/Footer';
 import { SAMPLES } from './utils/samples';
 import { runAllCheckers } from './validators/masterRunner';
@@ -29,7 +28,6 @@ export default function App() {
 
   // Modal states
   const [isFlowchartOpen, setIsFlowchartOpen] = useState(false);
-  const [isLoadTestOpen, setIsLoadTestOpen] = useState(false);
 
   // Claude AI state
   const [isFixingWithAI, setIsFixingWithAI] = useState(false);
@@ -198,7 +196,6 @@ export default function App() {
         onFormat={handleFormatGherkin}
         onOpenAISettings={() => setIsAISettingsOpen(true)}
         onOpenFlowchart={() => setIsFlowchartOpen(true)}
-        onOpenLoadTest={() => setIsLoadTestOpen(true)}
         isFixingWithAI={isFixingWithAI}
         hasIssues={(analysisResults?.totalErrors || 0) > 0 || (analysisResults?.totalWarnings || 0) > 0}
         hasCode={!!code && !!code.trim()}
@@ -243,13 +240,6 @@ export default function App() {
         onClose={() => setIsFlowchartOpen(false)}
         currentGherkinCode={code}
         onApplyGherkinCode={handleApplyFlowchartCode}
-      />
-
-      {/* Performance & Load Test Exporter Modal */}
-      <LoadTestExporterModal
-        isOpen={isLoadTestOpen}
-        onClose={() => setIsLoadTestOpen(false)}
-        gherkinCode={code}
       />
 
       {/* AI Settings Modal */}
