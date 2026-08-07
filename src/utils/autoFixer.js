@@ -853,13 +853,16 @@ export function fixSingleLine(code, lineNum, errorDetail) {
 
   if (index < 0 || index >= lines.length) return autoFixGherkin(code);
 
-  let line = lines[index];
+  const line = lines[index];
 
   if (errorDetail) {
-    line = fixLineByIssueDetail(line, errorDetail);
-    lines[index] = line;
-    return lines.join('\n');
+    const newLine = fixLineByIssueDetail(line, errorDetail);
+    if (newLine !== line) {
+      lines[index] = newLine;
+      return lines.join('\n');
+    }
   }
 
+  // Fallback: If targeted line fixer couldn't modify this line alone, run full auto-fixer engine!
   return autoFixGherkin(code);
 }
