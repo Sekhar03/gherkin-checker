@@ -222,6 +222,13 @@ export function FlowchartVisualizer({ isOpen, onClose, currentGherkinCode, onApp
     }
   };
 
+  const handleConvertPastedMermaid = () => {
+    if (pastedMermaid && pastedMermaid.trim()) {
+      const res = convertMermaidToGherkin(pastedMermaid);
+      setConvertedGherkinFromPaste(res);
+    }
+  };
+
   const handleConvertCurrentDiagramToGherkin = () => {
     const res = convertMermaidToGherkin(mermaidCode);
     setPastedMermaid(mermaidCode);
