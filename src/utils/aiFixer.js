@@ -34,9 +34,14 @@ ${errorsList.length > 0 ? errorsList.join('\n') : 'No hard errors reported.'}
 ${warningsList.length > 0 ? warningsList.join('\n') : 'No warnings reported.'}
 
 CRITICAL TASK:
-1. Carefully read all original Gherkin code and all 4 checker errors/warnings listed above.
+1. You MUST resolve 100% of ALL Hard ERRORS AND ALL Quality WARNINGS reported across all 4 checkers.
 2. Fix all syntax errors, keyword capitalization (Given, When, Then, Scenario, Feature), line indentations, step consistency, and unclosed quotes.
-3. If a Scenario Outline is missing an Examples table or header columns, add/update the Examples table with all required <placeholder> columns.
+3. Fix all warnings:
+   - Empty Backgrounds: Add a valid Given step under Background if empty.
+   - Missing Example Variables: Add all missing <variable> columns into the Examples table.
+   - Multiple Empty Lines: Remove consecutive empty lines down to a single blank line.
+   - Duplicate Tags: Remove tags on scenarios if they already exist on the Feature level.
+   - Repeated Keywords: Convert repeated Given/Given or When/When to 'And'.
 4. Output ONLY the fixed Gherkin code inside a markdown code block tagged with gherkin, e.g. \`\`\`gherkin ... \`\`\`. Do not include any conversational preamble or explanation.`;
 
   // Filter placeholder / invalid template keys

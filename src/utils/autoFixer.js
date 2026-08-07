@@ -317,6 +317,10 @@ function reconstructDocumentStructure(code) {
   outputLines.push('');
 
   if (backgroundBlock) {
+    const hasSteps = backgroundBlock.lines.some(l => /^(given|when|then|and|but|\*)\b/i.test(l.trim()));
+    if (!hasSteps) {
+      backgroundBlock.lines.push('Given the application is initialized and online');
+    }
     outputLines.push(`  Background:${backgroundBlock.title ? ' ' + backgroundBlock.title : ''}`);
     processStepBlockLines(backgroundBlock.lines, outputLines, '    ');
     outputLines.push('');
@@ -406,7 +410,8 @@ function reconstructDocumentStructure(code) {
     }
   });
 
-  return outputLines.join('\n');
+  const rawResult = outputLines.join('\n');
+  return rawResult.replace(/\n{3,}/g, '\n\n').split('\n').map(l => l.trimEnd()).join('\n');
 }
 
 /**
