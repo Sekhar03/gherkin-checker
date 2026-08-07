@@ -1,8 +1,9 @@
 import { runAllCheckers } from '../validators/masterRunner.js';
+import { analyzeStepDuplication } from './cukeReuseEngine.js';
 
 /**
  * Comprehensive Internal Rule-Based Gherkin Auto-Fixer Engine
- * Reads actual error & warning objects and their explicit suggested fix comments from all 4 checkers to repair both ERRORS and WARNINGS.
+ * Reads actual error & warning objects and their explicit suggested fix comments from all 5 checkers to repair both ERRORS and WARNINGS.
  */
 
 /**
@@ -25,6 +26,26 @@ export function autoFixGherkin(code, initialResults = null) {
   }
 
   let currentCode = code;
+
+  // Run CukeReuse Step Consolidation Pass
+  const cukeRes = analyzeStepDuplication(currentCode, 0.80);
+  if (cukeRes.nearDuplicateClusters && cukeRes.nearDuplicateClusters.length > 0) {
+    const lines = currentCode.split('\n');
+    cukeRes.nearDuplicateClusters.forEach(cluster => {
+      const canonical = cluster.canonical;
+      cluster.members.forEach(member => {
+        const lineIdx = member.line - 1;
+        if (lineIdx >= 0 && lineIdx < lines.length) {
+          const rawLine = lines[lineIdx];
+          const indent = rawLine.match(/^\s*/)?.[0] || '    ';
+          const match = rawLine.trim().match(/^(Given|When|Then|And|But|\*)\b/i);
+          const kw = match ? match[1] : member.keyword;
+          lines[lineIdx] = `${indent}${kw} ${canonical}`;
+        }
+      });
+    });
+    currentCode = lines.join('\n');
+  }
 
   // Run up to 4 repair passes until all errors & warnings are cleared
   for (let pass = 1; pass <= 4; pass++) {

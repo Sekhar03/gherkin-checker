@@ -1,11 +1,8 @@
+import { analyzeStepDuplication } from '../utils/cukeReuseEngine.js';
+
 /**
- * SET-IITGN UnifiedBDDLinter JS Engine
- * Direct JavaScript translation of SET-IITGN/UnifiedBDDLinter (linter.py & unified_linter.py)
- * Implements 28 exact rules with official Rule IDs:
- * - Style (S001 - S006): Trailing spaces, multiple empty lines, EOF newline, Indentation, Filename casing, Name length.
- * - Structure (ST001 - ST007): Unnamed feature/scenario, empty file, no feature/scenarios, duplicate scenarios, filename-feature match.
- * - Workflow (W001 - W004): Empty background, GWT step ordering, missing When action, missing Then verification.
- * - Quality (Q001 - Q012): Implementation details (imperative UI smells), vague language, hardcoded data in outlines.
+ * SET-IITGN UnifiedBDDLinter & CukeReuse JS Engine
+ * Direct JavaScript translation of SET-IITGN/UnifiedBDDLinter + amughalbscs16/cukereuse-release
  */
 
 export function runUnifiedBddLinter(code, filename = 'feature-test.feature') {
@@ -20,7 +17,7 @@ export function runUnifiedBddLinter(code, filename = 'feature-test.feature') {
       reason: '[ST003: Empty file] Feature file is completely empty.',
       suggestedFix: 'Add "Feature: <Title>" header and at least one scenario.'
     });
-    return { name: 'SET-IITGN UnifiedBDDLinter', errors, warnings };
+    return { name: 'SET-IITGN UnifiedBDDLinter & CukeReuse', errors, warnings };
   }
 
   const lines = code.split('\n');
@@ -345,9 +342,26 @@ export function runUnifiedBddLinter(code, filename = 'feature-test.feature') {
     }
   });
 
+  // CukeReuse Engine: Q004 Near-Duplicate Step Cluster Analysis
+  const cukeRes = analyzeStepDuplication(code, 0.80);
+  if (cukeRes.nearDuplicateClusters && cukeRes.nearDuplicateClusters.length > 0) {
+    cukeRes.nearDuplicateClusters.forEach(cluster => {
+      const lineNum = cluster.members[0]?.line || 1;
+      const canonical = cluster.canonical;
+      warnings.push({
+        line: lineNum,
+        rule: 'Q004',
+        category: 'quality',
+        reason: `[Q004: CukeReuse Near-Duplicate Cluster] Found ${cluster.count} near-duplicate step variants (Levenshtein similarity ≥80%). Canonical: "${canonical}".`,
+        suggestedFix: `Consolidate near-duplicate step variants into canonical phrasing: "${canonical}".`
+      });
+    });
+  }
+
   return {
-    name: 'SET-IITGN UnifiedBDDLinter',
+    name: 'SET-IITGN UnifiedBDDLinter & CukeReuse',
     errors,
-    warnings
+    warnings,
+    cukeReuseMetrics: cukeRes
   };
 }
