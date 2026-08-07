@@ -1,21 +1,23 @@
 /**
- * SET-IITGN UnifiedBDDLinter Engine for Gherkin Feature Files
- * Implements 28 Anti-Pattern Rules across 4 Families:
- * 1. Style: Indentation, trailing whitespace, blank lines, EOF newline, filename casing.
- * 2. Structure: Feature/Scenario name presence & uniqueness, non-empty file, filename-feature alignment.
- * 3. Workflow: Given->When->Then order, Single 'When' per scenario, Action & Verification presence, step count limit.
- * 4. Quality (Business-Readability): Leak implementation details (imperative UI selectors), vague language, hardcoded data, near-duplicate scenarios.
+ * SET-IITGN UnifiedBDDLinter JS Engine
+ * Direct JavaScript translation of SET-IITGN/UnifiedBDDLinter (linter.py & unified_linter.py)
+ * Implements 28 exact rules with official Rule IDs:
+ * - Style (S001 - S006): Trailing spaces, multiple empty lines, EOF newline, Indentation, Filename casing, Name length.
+ * - Structure (ST001 - ST007): Unnamed feature/scenario, empty file, no feature/scenarios, duplicate scenarios, filename-feature match.
+ * - Workflow (W001 - W004): Empty background, GWT step ordering, missing When action, missing Then verification.
+ * - Quality (Q001 - Q012): Implementation details (imperative UI smells), vague language, hardcoded data in outlines.
  */
 
-export function runUnifiedBddLinter(code, filename = 'feature_test.feature') {
+export function runUnifiedBddLinter(code, filename = 'feature-test.feature') {
   const errors = [];
   const warnings = [];
 
   if (!code || !code.trim()) {
     errors.push({
       line: 1,
-      rule: 'structure/non-empty-file',
-      reason: 'Feature file is empty. Feature files must contain a Feature specification header.',
+      rule: 'ST003',
+      category: 'structure',
+      reason: '[ST003: Empty file] Feature file is completely empty.',
       suggestedFix: 'Add "Feature: <Title>" header and at least one scenario.'
     });
     return { name: 'SET-IITGN UnifiedBDDLinter', errors, warnings };
@@ -23,13 +25,14 @@ export function runUnifiedBddLinter(code, filename = 'feature_test.feature') {
 
   const lines = code.split('\n');
 
-  // Rule 1: Style / End-of-file newline
+  // S003: EOF Newline
   if (lines.length > 0 && lines[lines.length - 1] !== '') {
     warnings.push({
       line: lines.length,
-      rule: 'style/eof-newline',
-      reason: 'File does not end with a single trailing newline.',
-      suggestedFix: 'Add a trailing newline at the end of the file.'
+      rule: 'S003',
+      category: 'style',
+      reason: '[S003: EOF newline] File does not end with a trailing newline.',
+      suggestedFix: 'Add a single trailing newline at the end of the file.'
     });
   }
 
@@ -49,25 +52,27 @@ export function runUnifiedBddLinter(code, filename = 'feature_test.feature') {
     const lineNum = i + 1;
     const trimmed = rawLine.trim();
 
-    // Rule 2: Style / Trailing Whitespace
+    // S001: No Trailing Spaces
     if (/\s+$/.test(rawLine)) {
       warnings.push({
         line: lineNum,
-        rule: 'style/trailing-whitespace',
-        reason: 'Line contains trailing whitespace characters.',
-        suggestedFix: 'Remove trailing spaces at line end.'
+        rule: 'S001',
+        category: 'style',
+        reason: `[S001: No trailing spaces] Line ${lineNum} contains trailing whitespace.`,
+        suggestedFix: 'Strip trailing whitespace.'
       });
     }
 
-    // Rule 3: Style / Multiple Blank Lines
+    // S002: Multiple Empty Lines
     if (!trimmed) {
       consecutiveEmptyLines++;
       if (consecutiveEmptyLines >= 2) {
         warnings.push({
           line: lineNum,
-          rule: 'style/multiple-blank-lines',
-          reason: 'Multiple consecutive blank lines detected.',
-          suggestedFix: 'Collapse consecutive empty lines to a single blank line.'
+          rule: 'S002',
+          category: 'style',
+          reason: `[S002: No multiple empty lines] Multiple consecutive blank lines at line ${lineNum}.`,
+          suggestedFix: 'Collapse consecutive blank lines down to a single blank line.'
         });
       }
       continue;
@@ -75,32 +80,44 @@ export function runUnifiedBddLinter(code, filename = 'feature_test.feature') {
       consecutiveEmptyLines = 0;
     }
 
-    // Rule 4: Feature Header Analysis
+    // ST001 & ST004: Feature Header Analysis
     if (trimmed.startsWith('Feature:')) {
+      const title = trimmed.replace(/^Feature:\s*/, '').trim();
+
       if (featureTitle) {
         errors.push({
           line: lineNum,
-          rule: 'structure/single-feature-per-file',
-          reason: 'Multiple "Feature:" headers found in a single file.',
-          suggestedFix: 'Split features into separate files or convert 2nd+ Feature to a "Rule:".'
+          rule: 'ST004',
+          category: 'structure',
+          reason: '[ST004: Single feature per file] Multiple "Feature:" headers found in one file.',
+          suggestedFix: 'Separate features into individual files or use "Rule:".'
         });
       } else {
-        featureTitle = trimmed.replace(/^Feature:\s*/, '').trim();
+        featureTitle = title;
         featureLine = lineNum;
 
-        if (!featureTitle) {
+        if (!title) {
           errors.push({
             line: lineNum,
-            rule: 'structure/feature-name-present',
-            reason: 'Feature header is missing a descriptive name.',
-            suggestedFix: 'Add a descriptive title after "Feature:".'
+            rule: 'ST001',
+            category: 'structure',
+            reason: '[ST001: Unnamed feature] Feature header is missing a name.',
+            suggestedFix: 'Provide a title after "Feature:".'
+          });
+        } else if (title.length > 80) {
+          warnings.push({
+            line: lineNum,
+            rule: 'S006',
+            category: 'style',
+            reason: `[S006: Name length] Feature title too long (${title.length} > 80 chars).`,
+            suggestedFix: 'Shorten Feature title.'
           });
         }
       }
       continue;
     }
 
-    // Rule 5: Background Analysis
+    // W001: Background Analysis
     if (trimmed.startsWith('Background:')) {
       inBackground = true;
       backgroundLine = lineNum;
@@ -108,7 +125,7 @@ export function runUnifiedBddLinter(code, filename = 'feature_test.feature') {
       continue;
     }
 
-    // Rule 6: Scenario Header Analysis
+    // ST002 & ST006: Scenario Analysis
     if (trimmed.startsWith('Scenario:') || trimmed.startsWith('Scenario Outline:') || trimmed.startsWith('Scenario Template:') || trimmed.startsWith('Example:')) {
       inBackground = false;
       const isOutline = trimmed.startsWith('Scenario Outline:') || trimmed.startsWith('Scenario Template:');
@@ -117,18 +134,29 @@ export function runUnifiedBddLinter(code, filename = 'feature_test.feature') {
       if (!title) {
         errors.push({
           line: lineNum,
-          rule: 'structure/scenario-name-present',
-          reason: 'Scenario header is missing a title.',
-          suggestedFix: 'Add a title describing the scenario goal.'
+          rule: 'ST002',
+          category: 'structure',
+          reason: '[ST002: Unnamed scenario] Scenario header is missing a name.',
+          suggestedFix: 'Add a title describing scenario goal.'
         });
       } else {
-        // Unique Scenario Names Check
+        if (title.length > 80) {
+          warnings.push({
+            line: lineNum,
+            rule: 'S006',
+            category: 'style',
+            reason: `[S006: Name length] Scenario title too long (${title.length} > 80 chars).`,
+            suggestedFix: 'Shorten Scenario title.'
+          });
+        }
+
         const cleanTitle = title.toLowerCase();
         if (scenarioTitles.has(cleanTitle)) {
           warnings.push({
             line: lineNum,
-            rule: 'structure/unique-scenario-names',
-            reason: `Duplicate scenario title "${title}" (previously defined on line ${scenarioTitles.get(cleanTitle)}).`,
+            rule: 'ST006',
+            category: 'structure',
+            reason: `[ST006: Duplicate scenario names] Duplicate scenario title "${title}" (first defined at line ${scenarioTitles.get(cleanTitle)}).`,
             suggestedFix: 'Rename scenario to be unique.'
           });
         } else {
@@ -144,7 +172,8 @@ export function runUnifiedBddLinter(code, filename = 'feature_test.feature') {
         whenCount: 0,
         givenCount: 0,
         thenCount: 0,
-        hasExamples: false
+        hasExamples: false,
+        sawThen: false
       };
       scenarios.push(currentScenario);
       continue;
@@ -168,14 +197,26 @@ export function runUnifiedBddLinter(code, filename = 'feature_test.feature') {
         backgroundStepsCount++;
       }
 
-      // Rule 7: Style / Step Indentation (4 spaces under Scenario/Background)
+      // S004: Indentation (2 or 4 spaces expected)
       const indent = rawLine.match(/^\s*/)?.[0]?.length || 0;
-      if (indent !== 4 && indent !== 6) {
+      if (indent !== 4 && indent !== 2) {
         warnings.push({
           line: lineNum,
-          rule: 'style/step-indentation',
-          reason: `Step indentation should be 4 spaces (found ${indent} spaces).`,
+          rule: 'S004',
+          category: 'style',
+          reason: `[S004: Indentation] Expected 4 spaces for step (found ${indent}).`,
           suggestedFix: 'Indent step with 4 spaces.'
+        });
+      }
+
+      // Step ending period warning
+      if (/[.]$/.test(stepText)) {
+        warnings.push({
+          line: lineNum,
+          rule: 'S007',
+          category: 'style',
+          reason: '[S007: Step periods] Step statement should not end with a period.',
+          suggestedFix: 'Remove ending period.'
         });
       }
 
@@ -186,98 +227,120 @@ export function runUnifiedBddLinter(code, filename = 'feature_test.feature') {
         if (keyword === 'Given') currentScenario.givenCount++;
         if (keyword === 'Then') currentScenario.thenCount++;
 
-        // Rule 8: Quality / Imperative UI Smells (Leaking Implementation Detail)
-        if (/\b(click|press|type|fill|select|checkbox|radio button|#[\w-]+|\.[\w-]+|xpath|css)\b/i.test(stepText)) {
+        // W002: Mis-ordered GWT steps (Given/When after Then)
+        if (keyword === 'Then') {
+          currentScenario.sawThen = true;
+        } else if (currentScenario.sawThen && (keyword === 'Given' || keyword === 'When')) {
           warnings.push({
             line: lineNum,
-            rule: 'quality/leak-implementation-detail',
-            reason: 'Step leaks implementation details (technical UI interaction) instead of business intent.',
-            suggestedFix: 'Refactor step to express business domain intent (e.g. "When submitting credentials").'
+            rule: 'W002',
+            category: 'workflow',
+            reason: `[W002: Step order] Step "${keyword}" appears after a "Then" verification step.`,
+            suggestedFix: 'Move "Given"/"When" prerequisites before "Then" assertions.'
           });
         }
 
-        // Rule 9: Quality / Vague Language Smell
+        // Q001: Implementation Details (Imperative UI Smells)
+        if (/\b(click|clicks|button|page|screen|input|type|types|select|checkbox|radio|#[\w-]+|\.[\w-]+|xpath|css)\b/i.test(stepText)) {
+          warnings.push({
+            line: lineNum,
+            rule: 'Q001',
+            category: 'quality',
+            reason: '[Q001: Implementation detail] Step leaks UI mechanics instead of business domain intent.',
+            suggestedFix: 'Refactor step to express business domain intent.'
+          });
+        }
+
+        // Q002: Vague Language Smell
         if (/\b(etc|stuff|do something|check page|some data|correctly|properly)\b/i.test(stepText)) {
           warnings.push({
             line: lineNum,
-            rule: 'quality/vague-language',
-            reason: 'Step uses vague or ambiguous language.',
-            suggestedFix: 'Replace ambiguous words with specific expected domain outcomes.'
+            rule: 'Q002',
+            category: 'quality',
+            reason: '[Q002: Vague language] Step uses vague or ambiguous language.',
+            suggestedFix: 'Specify explicit domain outcomes.'
           });
         }
 
-        // Rule 10: Quality / Hardcoded Data Smell
+        // Q003: Hardcoded Data in Outline
         if (/"[^"]*"|'[^']*'|\b\d+\b/.test(stepText) && currentScenario.isOutline && !/<[^>]+>/.test(stepText)) {
           warnings.push({
             line: lineNum,
-            rule: 'quality/hardcoded-data-in-outline',
-            reason: 'Scenario Outline uses hardcoded literal data instead of <placeholder> variables.',
-            suggestedFix: 'Replace hardcoded literal with a <variable> placeholder.'
+            rule: 'Q003',
+            category: 'quality',
+            reason: '[Q003: Hardcoded data in outline] Scenario Outline step uses literal data instead of <placeholder>.',
+            suggestedFix: 'Replace literal value with a <placeholder> variable.'
           });
         }
       }
     }
   }
 
-  // Rule 11: Workflow / Empty Background Check
-  if (inBackground || backgroundLine > 0) {
-    if (backgroundStepsCount === 0) {
-      warnings.push({
-        line: backgroundLine,
-        rule: 'workflow/no-empty-background',
-        reason: 'Background block is empty without any Given steps.',
-        suggestedFix: 'Add a Given step or remove the empty Background block.'
-      });
-    }
+  // ST004: No feature
+  if (!featureTitle) {
+    errors.push({
+      line: 1,
+      rule: 'ST004',
+      category: 'structure',
+      reason: '[ST004: No feature] File does not contain a "Feature:" header.',
+      suggestedFix: 'Add "Feature: <Title>" at top of file.'
+    });
   }
 
-  // Rule 12-16: Workflow & Structure checks per scenario
-  scenarios.forEach(sc => {
-    // Workflow / Single When Rule
-    if (sc.whenCount > 1) {
-      warnings.push({
-        line: sc.line,
-        rule: 'workflow/single-when-per-scenario',
-        reason: `Scenario "${sc.title}" contains ${sc.whenCount} "When" steps. BDD best practice dictates a single action trigger per scenario.`,
-        suggestedFix: 'Split into separate scenarios or convert additional "When" steps to "And".'
-      });
-    }
+  // ST005: No scenarios
+  if (scenarios.length === 0) {
+    errors.push({
+      line: featureLine > 0 ? featureLine : 1,
+      rule: 'ST005',
+      category: 'structure',
+      reason: '[ST005: No scenarios] Feature file contains no scenarios.',
+      suggestedFix: 'Add at least one Scenario block.'
+    });
+  }
 
-    // Workflow / Mandatory Action (When) & Verification (Then)
+  // W001: Empty background check
+  if (backgroundLine > 0 && backgroundStepsCount === 0) {
+    warnings.push({
+      line: backgroundLine,
+      rule: 'W001',
+      category: 'workflow',
+      reason: '[W001: Empty background] Background block is empty without steps.',
+      suggestedFix: 'Add Given steps or remove Background block.'
+    });
+  }
+
+  // Scenario-level checks
+  scenarios.forEach(sc => {
+    // W003: Missing action step
     if (sc.whenCount === 0) {
       warnings.push({
         line: sc.line,
-        rule: 'workflow/missing-action-step',
-        reason: `Scenario "${sc.title}" is missing an action step ("When").`,
-        suggestedFix: 'Add a "When" step to represent the action being tested.'
+        rule: 'W003',
+        category: 'workflow',
+        reason: `[W003: Missing action] Scenario "${sc.title}" has no "When" action step.`,
+        suggestedFix: 'Add a "When" action step.'
       });
     }
+
+    // W004: Missing verification step
     if (sc.thenCount === 0) {
       warnings.push({
         line: sc.line,
-        rule: 'workflow/missing-verification-step',
-        reason: `Scenario "${sc.title}" is missing an outcome assertion step ("Then").`,
-        suggestedFix: 'Add a "Then" step to verify the expected outcome.'
+        rule: 'W004',
+        category: 'workflow',
+        reason: `[W004: Missing verification] Scenario "${sc.title}" has no "Then" assertion step.`,
+        suggestedFix: 'Add a "Then" verification step.'
       });
     }
 
-    // Workflow / Step Count Limit (> 8 steps)
-    if (sc.steps.length > 8) {
-      warnings.push({
-        line: sc.line,
-        rule: 'workflow/excessive-step-count',
-        reason: `Scenario "${sc.title}" contains ${sc.steps.length} steps (recommended max is 8).`,
-        suggestedFix: 'Simplify scenario or extract prerequisite setup into a Background block.'
-      });
-    }
-
-    // Structure / Scenario Outline missing Examples
+    // ST002: Scenario Outline missing Examples
     if (sc.isOutline && !sc.hasExamples) {
       errors.push({
         line: sc.line,
-        rule: 'structure/scenario-outline-structure',
-        reason: `Scenario Outline "${sc.title}" is missing an "Examples:" table block.`,
-        suggestedFix: 'Add an "Examples:" block with header columns and test data rows.'
+        rule: 'ST002',
+        category: 'structure',
+        reason: `[ST002: Scenario Outline missing Examples] Scenario Outline "${sc.title}" is missing Examples table.`,
+        suggestedFix: 'Add "Examples:" table block.'
       });
     }
   });

@@ -44,7 +44,11 @@ export function autoFixGherkin(code, initialResults = null) {
   }
 
   // Final structural pass & indentation pass
-  return formatAndStructureGherkin(currentCode);
+  let formatted = formatAndStructureGherkin(currentCode);
+  if (formatted && !formatted.endsWith('\n')) {
+    formatted += '\n';
+  }
+  return formatted;
 }
 
 /**

@@ -12,7 +12,9 @@ dist
 dist-ssr
 *.local
 .system_generated
-scratch_*
+scratch/*
+scratch
+
 
 # Editor directories and files
 .vscode/*
