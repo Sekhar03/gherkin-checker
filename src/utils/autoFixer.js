@@ -565,45 +565,105 @@ function processStepBlockLines(lines, outputArr, indent, onPlaceholderFound) {
 
 /**
  * Targeted Line Fixer reading the exact suggested fix comment, reason, and rule from issue objects!
+ * Supports all 5 checkers: SET-IITGN UnifiedBDDLinter, CukeReuse, gherkin-lint, Matriz88, sistar, and @cucumber/gherkin.
  */
 function fixLineByIssueDetail(line, issue) {
   if (!line || !issue) return line;
-  const fixText = issue.fix || '';
-  const rule = issue.rule || '';
+  const fixText = issue.suggestedFix || issue.fix || '';
+  const rule = (issue.rule || '').toUpperCase();
   const reason = issue.reason || '';
+  const trimmed = line.trim();
 
-  // 1. Read explicit "Change step to '...'" from issue.fix comment!
+  // 1. CukeReuse Near-Duplicate Canonical Consolidation (Q004)
+  const canonicalMatch = fixText.match(/canonical phrasing:\s*["']([^"']+)["']/i) || reason.match(/Canonical:\s*["']([^"']+)["']/i);
+  if (canonicalMatch) {
+    const canonicalText = canonicalMatch[1];
+    const indent = line.match(/^\s*/)?.[0] || '    ';
+    const kwMatch = trimmed.match(/^(Given|When|Then|And|But|\*)\b/i);
+    const kw = kwMatch ? kwMatch[1] : 'Given';
+    return `${indent}${kw} ${canonicalText}`;
+  }
+
+  // 2. Read explicit "Change step to '...'" from fix text
   const changeStepMatch = fixText.match(/Change step to ["']([^"']+)["']/i);
   if (changeStepMatch) {
     const replacementStep = changeStepMatch[1];
     return `    ${replacementStep}`;
   }
 
-  // 2. Read explicit "Change 'X' to 'Y'" keyword replacement from issue.fix comment!
+  // 3. Read explicit "Change 'X' to 'Y'" keyword replacement
   const changeKeywordMatch = fixText.match(/Change ["'](Given|When|Then)["'] to ["'](And|But)["']/i);
   if (changeKeywordMatch) {
     const toKw = changeKeywordMatch[2];
     return line.replace(/^(Given|When|Then)\b/i, toKw);
   }
 
-  // 3. Read explicit "Rename tag 'X' to 'Y'" from issue.fix comment!
+  // 4. Read explicit "Rename tag 'X' to 'Y'"
   const renameTagMatch = fixText.match(/Rename tag ["']@[^"']+["'] to ["'](@[^"']+)["']/i);
   if (renameTagMatch) {
     const newTag = renameTagMatch[1];
     return `  ${newTag}`;
   }
 
-  // 4. Read explicit "Remove duplicate tag 'X'" from issue.fix comment!
+  // 5. Read explicit "Remove duplicate tag 'X'"
   const removeTagMatch = fixText.match(/Remove duplicate tag ["'](@[^"']+)["']/i);
   if (removeTagMatch) {
     const tagToRemove = removeTagMatch[1];
-    const tags = line.trim().split(/\s+/).filter(t => t !== tagToRemove);
+    const tags = trimmed.split(/\s+/).filter(t => t !== tagToRemove);
     return tags.length > 0 ? `  ${tags.join(' ')}` : '';
   }
 
-  // Fallbacks guided by rule and reason
-  if (rule === 'imperative-steps-warning' || reason.includes('procedural/imperative UI detail')) {
-    const stepMatch = line.trim().match(/^(given|when|then|and|but|\*)\b\s*(.*)/i);
+  // Rule-based Quick Fix mappings
+  // S001 / No Trailing Spaces
+  if (rule === 'S001' || rule === 'NO-TRAILING-SPACES' || reason.includes('trailing whitespace')) {
+    return line.trimEnd();
+  }
+
+  // S004 / Indentation
+  if (rule === 'S004' || rule === 'INDENTATION' || reason.includes('Indentation')) {
+    if (/^(Given|When|Then|And|But|\*)\b/i.test(trimmed)) {
+      return `    ${trimmed}`;
+    }
+    if (trimmed.startsWith('Feature:')) return trimmed;
+    if (trimmed.startsWith('Scenario:') || trimmed.startsWith('Scenario Outline:') || trimmed.startsWith('Background:')) {
+      return `  ${trimmed}`;
+    }
+    if (trimmed.startsWith('|')) return `      ${trimmed}`;
+  }
+
+  // S007 / Step Periods
+  if (rule === 'S007' || rule === 'NO-ENDING-PUNCTUATION' || reason.includes('punctuation') || reason.includes('period')) {
+    return line.replace(/[.,;:]\s*$/, '').trimEnd();
+  }
+
+  // ST001 / Unnamed Feature
+  if (rule === 'ST001' || reason.includes('Unnamed feature')) {
+    return 'Feature: User Feature Specification';
+  }
+
+  // ST002 / Unnamed Scenario
+  if (rule === 'ST002' || reason.includes('Unnamed scenario')) {
+    return '  Scenario: Standard User Operation';
+  }
+
+  // ST006 / Duplicate Scenario Names
+  if (rule === 'ST006' || reason.includes('Duplicate scenario title')) {
+    return line.replace(/^(Scenario Outline:|Scenario:)\s*(.*)/i, (m, kw, title) => `  ${kw} ${title} (Alternative)`);
+  }
+
+  // W001 / Empty Background
+  if (rule === 'W001' || reason.includes('Empty background')) {
+    return `${line}\n    Given the application is initialized and online`;
+  }
+
+  // W002 / Step Order (Given/When after Then)
+  if (rule === 'W002' || rule === 'KEYWORDS-IN-LOGICAL-ORDER') {
+    return line.replace(/^\s*(Given|When|Then)\b/i, '    And');
+  }
+
+  // Q001 / Imperative UI steps
+  if (rule === 'Q001' || rule === 'IMPERATIVE-STEPS-WARNING' || reason.includes('implementation detail') || reason.includes('imperative')) {
+    const stepMatch = trimmed.match(/^(given|when|then|and|but|\*)\b\s*(.*)/i);
     if (stepMatch) {
       const kw = stepMatch[1];
       const fixedText = refactorImperativeStep(stepMatch[2]);
@@ -611,8 +671,33 @@ function fixLineByIssueDetail(line, issue) {
     }
   }
 
-  if (rule === 'no-first-person-perspective' || reason.includes('first-person phrasing')) {
-    const stepMatch = line.trim().match(/^(given|when|then|and|but|\*)\b\s*(.*)/i);
+  // Q002 / Vague Language
+  if (rule === 'Q002' || reason.includes('Vague language')) {
+    const stepMatch = trimmed.match(/^(given|when|then|and|but|\*)\b\s*(.*)/i);
+    if (stepMatch) {
+      const kw = stepMatch[1];
+      let fixedText = stepMatch[2]
+        .replace(/\betc\b/gi, '')
+        .replace(/\bstuff\b/gi, 'data')
+        .replace(/\bdo something\b/gi, 'process request')
+        .replace(/\bcheck page\b/gi, 'verify dashboard display')
+        .replace(/\bsome data\b/gi, 'valid input data')
+        .replace(/\bcorrectly\b/gi, 'successfully')
+        .replace(/\bproperly\b/gi, 'successfully');
+      return `    ${kw} ${fixedText.replace(/\s+/g, ' ').trim()}`;
+    }
+  }
+
+  // Q003 / Hardcoded Data in Outline
+  if (rule === 'Q003' || reason.includes('Hardcoded data in outline')) {
+    let placeholderIdx = 1;
+    const fixedText = trimmed.replace(/"[^"]*"|'[^']*'|\b\d+\b/g, () => `<param_${placeholderIdx++}>`);
+    return `    ${fixedText}`;
+  }
+
+  // First person refactoring
+  if (rule === 'NO-FIRST-PERSON-PERSPECTIVE' || reason.includes('first-person')) {
+    const stepMatch = trimmed.match(/^(given|when|then|and|but|\*)\b\s*(.*)/i);
     if (stepMatch) {
       const kw = stepMatch[1];
       const fixedText = refactorFirstPerson(stepMatch[2]);
@@ -620,24 +705,13 @@ function fixLineByIssueDetail(line, issue) {
     }
   }
 
-  if (rule === 'no-ending-punctuation' || reason.includes('ends with punctuation')) {
-    return line.replace(/[.,;:]\s*$/, '').trimEnd();
+  // Fallback: If line was not altered, refactor any first-person or imperative step on line
+  if (/\b(I|my)\b/.test(trimmed)) {
+    const stepMatch = trimmed.match(/^(given|when|then|and|but|\*)\b\s*(.*)/i);
+    if (stepMatch) {
+      return `    ${stepMatch[1]} ${refactorFirstPerson(stepMatch[2])}`;
+    }
   }
-
-  if (rule === 'use-and' || rule === 'one-behavior-per-scenario' || rule === 'keywords-in-logical-order') {
-    return line.replace(/^\s*(Given|When|Then)\b/i, '    And');
-  }
-
-  if (rule === 'tag-convention') {
-    const parts = line.trim().split(/\s+/);
-    const cleaned = parts.map(tag => {
-      if (!tag.startsWith('@')) return tag;
-      return '@' + tag.slice(1).toLowerCase().replace(/[^a-z0-9-]/g, '-');
-    }).join(' ');
-    return '  ' + cleaned;
-  }
-
-  if (rule === 'no-trailing-spaces') return line.trimEnd();
 
   return line;
 }
