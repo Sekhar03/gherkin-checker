@@ -1,19 +1,21 @@
-# 🥒 4-in-1 Gherkin Checker & Validator Suite — User Manual
+# 🥒 5-in-1 Gherkin Checker & Validator Suite — User Manual
 
-A modern, high-performance web application designed to validate Gherkin `.feature` files simultaneously through **4 distinct Gherkin checkers and validators**.
+A modern, high-performance web application designed to validate Gherkin `.feature` files simultaneously through **5 distinct Gherkin checkers and validators**.
 
 ---
 
 ## 🛠️ 1. Technologies & Tools Used
 
-### The 4 Integrated Gherkin Validation Engines
-1. **`@cucumber/gherkin`** ([cucumber/gherkin-javascript](https://github.com/cucumber/gherkin-javascript))
+### The 5 Integrated Gherkin Validation Engines
+1. **`SET-IITGN/UnifiedBDDLinter`** ([SET-IITGN/UnifiedBDDLinter](https://github.com/SET-IITGN/UnifiedBDDLinter))
+   - *28 BDD Anti-Pattern Rules Engine*: Analyzes Style (indentation, empty lines, EOF newline), Structure (feature/scenario name uniqueness & alignment), Workflow (single `When` per scenario, action/verification presence, step count limits), and Quality (detects leaking technical UI implementation details, vague language, and hardcoded data).
+2. **`@cucumber/gherkin`** ([cucumber/gherkin-javascript](https://github.com/cucumber/gherkin-javascript))
    - *Official Cucumber AST Parser*: Validates AST tokens, syntax correctness, tag syntax, tables, and document hierarchy.
-2. **`gherkin-lint`** ([gherkin-lint/gherkin-lint](https://github.com/gherkin-lint/gherkin-lint))
+3. **`gherkin-lint`** ([gherkin-lint/gherkin-lint](https://github.com/gherkin-lint/gherkin-lint))
    - *Code Quality Linter*: Enforces best practices including indentation rules, duplicate scenario names, empty files, repeated keywords (`Given`/`When`/`Then`), and logical step flow (`keywords-in-logical-order`).
-3. **`Matriz88/gherkin-checker`** ([Matriz88/gherkin-checker](https://github.com/Matriz88/gherkin-checker))
+4. **`Matriz88/gherkin-checker`** ([Matriz88/gherkin-checker](https://github.com/Matriz88/gherkin-checker))
    - *Consistency & Step Matcher*: Checks scenario step consistency, dangling step conjunctions (`And`/`But`), unclosed quote literals (`"` / `'`), and verifies Scenario Outline `<parameter>` references match `Examples:` table headers.
-4. **`sistar/gherkin-validator`** ([sistar/gherkin-validator](https://github.com/sistar/gherkin-validator))
+5. **`sistar/gherkin-validator`** ([sistar/gherkin-validator](https://github.com/sistar/gherkin-validator))
    - *Strict Lexer Scanner*: Performs token boundary validation, pipe alignments on table rows (`|`), multiline DocString fencing (`"""`), and header token rules.
 
 ### Frontend Application Stack

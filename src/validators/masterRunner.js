@@ -2,6 +2,7 @@ import { checkCucumberGherkin } from './cucumberParser.js';
 import { checkGherkinLint } from './gherkinLinter.js';
 import { checkMatrizConsistency } from './matrizChecker.js';
 import { checkSistarLexer } from './sistarValidator.js';
+import { runUnifiedBddLinter } from './unifiedBddLinter.js';
 
 export function runAllCheckers(gherkinText) {
   const startTime = performance.now();
@@ -10,8 +11,9 @@ export function runAllCheckers(gherkinText) {
   const lintRes = checkGherkinLint(gherkinText);
   const matrizRes = checkMatrizConsistency(gherkinText);
   const sistarRes = checkSistarLexer(gherkinText);
+  const unifiedBddRes = runUnifiedBddLinter(gherkinText);
 
-  const checkers = [cucumberRes, lintRes, matrizRes, sistarRes];
+  const checkers = [cucumberRes, lintRes, matrizRes, sistarRes, unifiedBddRes];
 
   const totalErrors = checkers.reduce((acc, c) => acc + c.errors.length, 0);
   const totalWarnings = checkers.reduce((acc, c) => acc + c.warnings.length, 0);

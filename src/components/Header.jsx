@@ -4,6 +4,7 @@ import { SAMPLES } from '../utils/samples';
 
 export function Header({ theme, onToggleTheme, currentSampleId, onSelectSample, totalErrors, totalWarnings, overallPass, executionTimeMs, isTested, onAutoFix, onFormat, onOpenAISettings, onOpenFlowchart, isFixingWithAI, hasIssues, hasCode }) {
   const repos = [
+    { name: 'SET-IITGN/UnifiedBDDLinter', url: 'https://github.com/SET-IITGN/UnifiedBDDLinter', tag: '28 Anti-Pattern Rules' },
     { name: 'gherkin-lint', url: 'https://github.com/gherkin-lint/gherkin-lint', tag: 'Linter Rules' },
     { name: '@cucumber/gherkin', url: 'https://github.com/cucumber/gherkin-javascript', tag: 'Cucumber AST Parser' },
     { name: 'Matriz88/gherkin-checker', url: 'https://github.com/Matriz88/gherkin-checker', tag: 'Consistency & Steps' },
@@ -40,7 +41,7 @@ export function Header({ theme, onToggleTheme, currentSampleId, onSelectSample, 
           <div className="brand-text">
             <div className="brand-title-row">
               <h1 className="brand-title">Gherkin Checker & Validator</h1>
-              <span className="version-badge">4-in-1 Suite</span>
+              <span className="version-badge">5-in-1 Suite</span>
               <a
                 href="https://www.linkedin.com/in/sekhar-parida/"
                 target="_blank"
@@ -54,7 +55,7 @@ export function Header({ theme, onToggleTheme, currentSampleId, onSelectSample, 
               </a>
             </div>
             <p className="brand-subtitle">
-              Multi-Engine Gherkin <code className="code-tag">.feature</code> File Analyzer running 4 Checkers Simultaneously
+              Multi-Engine Gherkin <code className="code-tag">.feature</code> File Analyzer running 5 Checkers Simultaneously
             </p>
           </div>
         </div>
