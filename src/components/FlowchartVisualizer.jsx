@@ -216,9 +216,19 @@ export function FlowchartVisualizer({ isOpen, onClose, currentGherkinCode, onApp
     }
   };
 
-  const handleConvertPastedMermaid = () => {
-    const res = convertMermaidToGherkin(pastedMermaid);
+  // Auto-convert pasted Mermaid code whenever it changes
+  useEffect(() => {
+    if (pastedMermaid && pastedMermaid.trim()) {
+      const res = convertMermaidToGherkin(pastedMermaid);
+      setConvertedGherkinFromPaste(res);
+    }
+  }, [pastedMermaid]);
+
+  const handleConvertCurrentDiagramToGherkin = () => {
+    const res = convertMermaidToGherkin(mermaidCode);
+    setPastedMermaid(mermaidCode);
     setConvertedGherkinFromPaste(res);
+    setActiveTab('pasteMermaid');
   };
 
   return (
@@ -300,6 +310,10 @@ export function FlowchartVisualizer({ isOpen, onClose, currentGherkinCode, onApp
                   <button onClick={handleCopyMermaid} className="fc-btn" title="Copy Mermaid Syntax">
                     {copied ? <Check size={14} className="text-green" /> : <Copy size={14} />}
                     <span>{copied ? 'Copied!' : 'Copy Code'}</span>
+                  </button>
+                  <button onClick={handleConvertCurrentDiagramToGherkin} className="fc-btn" title="Convert this Flowchart to Gherkin Code">
+                    <ArrowRightLeft size={14} className="text-cyan" />
+                    <span>Convert to Gherkin</span>
                   </button>
                   <button onClick={handleExportSvg} className="fc-btn primary" title="Download SVG Diagram">
                     <Download size={14} />
