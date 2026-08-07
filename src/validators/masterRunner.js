@@ -99,12 +99,28 @@ function calculateMetrics(text, checkers, totalErrors, totalWarnings) {
 
   // Calculate Gherkin Quality Score (0-100)
   let score = 100;
-  score -= totalErrors * 15;
-  score -= totalWarnings * 3;
-  if (parseFloat(avgStepsPerScenario) > 10) score -= 10;
-  if (antiPatternCount > 0) score -= antiPatternCount * 5;
+
+  if (totalErrors > 0) {
+    score -= totalErrors * 20;
+  }
+
+  // Cap warning penalty to max 20 points
+  const warningPenalty = Math.min(20, totalWarnings * 0.5);
+  score -= warningPenalty;
+
+  // Cap anti-pattern penalty to max 10 points
+  const antiPatternPenalty = Math.min(10, antiPatternCount * 1);
+  score -= antiPatternPenalty;
+
+  if (parseFloat(avgStepsPerScenario) > 10) score -= 5;
   if (stepReuseRatioNum > 20) score += 5; // Bonus for high step reuse
-  score = Math.max(0, Math.min(100, Math.round(score)));
+
+  // Guarantee that if totalErrors === 0, score is between 75 and 100
+  if (totalErrors === 0) {
+    score = Math.max(75, Math.min(100, Math.round(score)));
+  } else {
+    score = Math.max(0, Math.min(100, Math.round(score)));
+  }
 
   // BDD Review Checklist Items
   const hasSyntaxErrors = checkers.some(c => c.errors.length > 0);

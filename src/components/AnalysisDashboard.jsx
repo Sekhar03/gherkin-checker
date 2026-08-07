@@ -103,14 +103,14 @@ export function AnalysisDashboard({ results, isTested, _onRunTest, onHighlightLi
 
         <div className="banner-content">
           <div className="banner-tag">
-            {overallPass ? 'ALL 4 CHECKERS PASSED' : 'VALIDATION ISSUES DETECTED'}
+            {overallPass ? `ALL ${checkers.length} CHECKERS PASSED` : 'VALIDATION ISSUES DETECTED'}
           </div>
           <h2 className="banner-title">
-            {overallPass ? '✅ All 4 Checkers Passed Cleanly!' : `❌ ${totalErrors} Error${totalErrors === 1 ? '' : 's'} & ${totalWarnings} Warning${totalWarnings === 1 ? '' : 's'}`}
+            {overallPass ? `✅ All ${checkers.length} Checkers Passed Cleanly!` : `❌ ${totalErrors} Error${totalErrors === 1 ? '' : 's'} & ${totalWarnings} Warning${totalWarnings === 1 ? '' : 's'}`}
           </h2>
           <p className="banner-desc">
             {overallPass
-              ? 'Your Gherkin feature file satisfies @cucumber/gherkin AST specs, gherkin-lint quality standards, Matriz88 step consistency, and sistar lexing structure.'
+              ? `Your Gherkin feature file satisfies @cucumber/gherkin AST specs, gherkin-lint quality standards, Matriz88 step consistency, sistar lexing structure, and SET-IITGN UnifiedBDDLinter 28 anti-pattern rules.`
               : 'Review detailed breakdown below or click "Auto-Fix (No AI)" to automatically resolve syntax, keywords, and indentation using our internal rule engine.'}
           </p>
 
@@ -186,7 +186,7 @@ export function AnalysisDashboard({ results, isTested, _onRunTest, onHighlightLi
           className={`dash-tab-btn ${activeTab === 'checkers' ? 'active' : ''}`}
           onClick={() => setActiveTab('checkers')}
         >
-          <ShieldCheck size={16} /> 4 Checkers Results ({totalErrors + totalWarnings})
+          <ShieldCheck size={16} /> {checkers.length} Checkers Results ({totalErrors + totalWarnings})
         </button>
 
         <button
