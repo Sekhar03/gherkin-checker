@@ -41,22 +41,20 @@ export function Header({ theme, onToggleTheme, currentSampleId, onSelectSample, 
             <div className="brand-title-row">
               <h1 className="brand-title">Gherkin Checker & Validator</h1>
               <span className="version-badge">4-in-1 Suite</span>
+              <a
+                href="https://www.linkedin.com/in/sekhar-parida/"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="dev-badge-prominent"
+                title="Connect with Sekhar Parida on LinkedIn"
+              >
+                <span className="dev-by-text">Developed by</span>
+                <Linkedin size={14} className="dev-linkedin-icon" />
+                <span className="dev-name-bold">Sekhar Parida</span>
+              </a>
             </div>
             <p className="brand-subtitle">
-              Multi-Engine Gherkin <code className="code-tag">.feature</code> File Analyzer
-              <span className="header-dev-credit">
-                • Developed by{' '}
-                <a
-                  href="https://www.linkedin.com/in/sekhar-parida/"
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="header-dev-link"
-                  title="Connect with Sekhar Parida on LinkedIn"
-                >
-                  <Linkedin size={12} />
-                  <span>Sekhar Parida</span>
-                </a>
-              </span>
+              Multi-Engine Gherkin <code className="code-tag">.feature</code> File Analyzer running 4 Checkers Simultaneously
             </p>
           </div>
         </div>

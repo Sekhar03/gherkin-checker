@@ -1,24 +1,25 @@
 import React from 'react';
-import { Linkedin, Heart, ExternalLink, Code2 } from 'lucide-react';
+import { Linkedin, Sparkles, ExternalLink, Code2 } from 'lucide-react';
 
 export function Footer() {
   return (
     <footer className="app-footer">
       <div className="footer-content">
         <div className="developer-credit-wrapper">
-          <span className="developed-by-label">
-            Developed by
-          </span>
           <a
             href="https://www.linkedin.com/in/sekhar-parida/"
             target="_blank"
             rel="noopener noreferrer"
-            className="developer-linkedin-link"
+            className="developer-linkedin-link-hero"
             title="Connect with Sekhar Parida on LinkedIn"
           >
-            <Linkedin size={15} className="linkedin-icon" />
-            <span className="developer-name">Sekhar Parida</span>
-            <ExternalLink size={12} className="external-icon" />
+            <Sparkles size={15} className="sparkle-glow-icon" />
+            <span className="dev-hero-label">Developed by</span>
+            <div className="dev-hero-pill">
+              <Linkedin size={15} className="linkedin-brand-icon" />
+              <span className="developer-hero-name">Sekhar Parida</span>
+            </div>
+            <ExternalLink size={13} className="external-link-arrow" />
           </a>
         </div>
 
