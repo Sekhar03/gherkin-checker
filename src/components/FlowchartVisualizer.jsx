@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { 
   X, Download, Copy, Check, RefreshCw, Plus, Trash2, ArrowRightLeft, 
-  Sparkles, Layers, FileCode, Play, Code2, ZoomIn, ZoomOut, Maximize2 
+  Sparkles, Layers, FileCode, Play, Code2, ZoomIn, ZoomOut, Maximize2, UploadCloud, FileUp 
 } from 'lucide-react';
 import mermaid from 'mermaid';
 import { convertGherkinToMermaid } from '../utils/gherkinToMermaid';
@@ -25,7 +25,10 @@ export function FlowchartVisualizer({ isOpen, onClose, currentGherkinCode, onApp
   const [renderError, setRenderError] = useState(null);
   const [copied, setCopied] = useState(false);
   const [zoomLevel, setZoomLevel] = useState(1);
+  const [uploadNotice, setUploadNotice] = useState(null);
+  const [isDragging, setIsDragging] = useState(false);
   const diagramContainerRef = useRef(null);
+  const fileInputRef = useRef(null);
 
   // Paste Mermaid tab state
   const [pastedMermaid, setPastedMermaid] = useState('');
@@ -229,6 +232,59 @@ export function FlowchartVisualizer({ isOpen, onClose, currentGherkinCode, onApp
     }
   };
 
+  const processUploadedFile = (file) => {
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = (e) => {
+      const text = e.target.result || '';
+      const isMermaid = file.name.endsWith('.mermaid') || file.name.endsWith('.mmd') || text.trim().startsWith('graph') || text.trim().startsWith('flowchart');
+
+      if (isMermaid) {
+        setPastedMermaid(text);
+        const gherkinRes = convertMermaidToGherkin(text);
+        setConvertedGherkinFromPaste(gherkinRes);
+        setActiveTab('pasteMermaid');
+        setUploadNotice(`📁 Loaded "${file.name}"! Converted Mermaid diagram to Gherkin.`);
+      } else {
+        // Gherkin .feature or .txt file
+        const mermaidRes = convertGherkinToMermaid(text);
+        setMermaidCode(mermaidRes);
+        if (onApplyGherkinCode) {
+          onApplyGherkinCode(text);
+        }
+        setActiveTab('diagram');
+        setUploadNotice(`📁 Loaded "${file.name}"! Flowchart generated & editor updated.`);
+      }
+      setTimeout(() => setUploadNotice(null), 4000);
+    };
+    reader.readAsText(file);
+  };
+
+  const handleFileChange = (e) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      processUploadedFile(file);
+    }
+  };
+
+  const handleDragOver = (e) => {
+    e.preventDefault();
+    setIsDragging(true);
+  };
+
+  const handleDragLeave = () => {
+    setIsDragging(false);
+  };
+
+  const handleDrop = (e) => {
+    e.preventDefault();
+    setIsDragging(false);
+    const file = e.dataTransfer.files?.[0];
+    if (file) {
+      processUploadedFile(file);
+    }
+  };
+
   const handleConvertCurrentDiagramToGherkin = () => {
     const res = convertMermaidToGherkin(mermaidCode);
     setPastedMermaid(mermaidCode);
@@ -241,6 +297,22 @@ export function FlowchartVisualizer({ isOpen, onClose, currentGherkinCode, onApp
   return (
     <div className="modal-backdrop">
       <div className="flowchart-modal-content">
+        {/* Hidden File Input */}
+        <input
+          type="file"
+          ref={fileInputRef}
+          onChange={handleFileChange}
+          accept=".feature,.txt,.mermaid,.mmd"
+          style={{ display: 'none' }}
+        />
+
+        {/* Upload Toast Notice */}
+        {uploadNotice && (
+          <div className="fc-toast-notice">
+            {uploadNotice}
+          </div>
+        )}
+
         {/* Modal Header */}
         <div className="modal-header">
           <div className="modal-title-group">
@@ -305,6 +377,14 @@ export function FlowchartVisualizer({ isOpen, onClose, currentGherkinCode, onApp
                 </div>
 
                 <div className="canvas-controls">
+                  <button
+                    onClick={() => fileInputRef.current?.click()}
+                    className="fc-btn btn-upload-fc"
+                    title="Upload .feature, .txt, or .mermaid file to generate flowchart instantly"
+                  >
+                    <UploadCloud size={14} className="text-cyan" />
+                    <span>Upload File</span>
+                  </button>
                   <button onClick={() => setZoomLevel(prev => Math.min(prev + 0.2, 2.5))} className="fc-btn" title="Zoom In">
                     <ZoomIn size={14} />
                   </button>
@@ -334,7 +414,18 @@ export function FlowchartVisualizer({ isOpen, onClose, currentGherkinCode, onApp
                   <p>{renderError}</p>
                 </div>
               ) : (
-                <div className="diagram-canvas-scroll">
+                <div
+                  className={`diagram-canvas-scroll ${isDragging ? 'dragging-over' : ''}`}
+                  onDragOver={handleDragOver}
+                  onDragLeave={handleDragLeave}
+                  onDrop={handleDrop}
+                >
+                  {isDragging && (
+                    <div className="dropzone-overlay">
+                      <FileUp size={36} className="text-cyan spin-pulse" />
+                      <span>Drop `.feature` or `.mermaid` file here to generate flowchart!</span>
+                    </div>
+                  )}
                   <div 
                     ref={diagramContainerRef} 
                     className="mermaid-svg-wrapper"
@@ -499,10 +590,16 @@ export function FlowchartVisualizer({ isOpen, onClose, currentGherkinCode, onApp
                     onChange={(e) => setPastedMermaid(e.target.value)}
                     placeholder={`graph TD\n    feat["📋 Feature: User Login"]\n    sc1["🧪 Successful Login"]\n    feat --> sc1\n    step1["🟩 Given: I am on login page"]\n    sc1 --> step1\n    step2["🟧 When: I submit valid credentials"]\n    step1 --> step2\n    step3["🟦 Then: I see dashboard"]\n    step2 --> step3`}
                   />
-                  <button onClick={handleConvertPastedMermaid} className="btn-convert-paste">
-                    <RefreshCw size={14} />
-                    <span>Convert to Gherkin</span>
-                  </button>
+                  <div className="paste-actions-row">
+                    <button onClick={handleConvertPastedMermaid} className="btn-convert-paste flex-1">
+                      <RefreshCw size={14} />
+                      <span>Convert to Gherkin</span>
+                    </button>
+                    <button onClick={() => fileInputRef.current?.click()} className="btn-convert-paste">
+                      <UploadCloud size={14} className="text-cyan" />
+                      <span>Upload File</span>
+                    </button>
+                  </div>
                 </div>
 
                 <div className="paste-output-box">
